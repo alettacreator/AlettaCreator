@@ -23,6 +23,27 @@ local TeleportService = game:GetService("TeleportService")
 local GuiService = game:GetService("GuiService")
 local VirtualUser = game:GetService("VirtualUser")
 
+--// SINGLE EXECUTE / KEEP LOADED
+--// Jika aktif, execute kedua tidak membuat GUI/fitur baru.
+--// Jika toggle dimatikan dari Config, execute ulang tetap diperbolehkan.
+local AlettaRuntime = nil
+pcall(function()
+    if type(getgenv) == "function" then
+        AlettaRuntime = getgenv()
+    elseif type(shared) == "table" then
+        AlettaRuntime = shared
+    end
+end)
+
+if AlettaRuntime and AlettaRuntime.AlettaCreatorRuntime then
+    local runtime = AlettaRuntime.AlettaCreatorRuntime
+    local existing = runtime.Gui
+    if runtime.SingleExecute ~= false and existing and existing.Parent then
+        return
+    end
+    AlettaRuntime.AlettaCreatorRuntime = nil
+end
+
 local player = Players.LocalPlayer
 if not player then
     warn("[Aletta] LocalPlayer belum tersedia.")
@@ -61,6 +82,8 @@ for _, name in ipairs({"AlettaCreatorGUI", "AlettaCrosshair", "AlettaESPLabels",
 end
 
 local Values = {}
+Values["Auto Skill Check Mode"] = "Legit"
+Values["Auto Skill Check"] = false
 Values["Auto Sprint Mobile"] = false
 Values["ESP Range"] = 600
 Values["ESP Distance"] = 600
@@ -69,6 +92,10 @@ Values["Parry Radius"] = 13
 Values["Safety Parry"] = false
 Values["Aggressive Parry"] = false
 Values["Auto Parry"] = false
+Values["Show FOV Circle"] = true
+Values["FOV Radius (pixels)"] = 120
+Values["Predict Killer"] = false
+Values["Moonwalk Held"] = false
 
 local Hooks = {}
 local Defaults = {}
@@ -215,7 +242,8 @@ local CONFIG = {
                 T("Safety Parry"),
                 T("Aggressive Parry"),
                 S("ESP Range", 0, 600, 600),
-                S("Parry Radius", 0, 26, 13),
+                S("Parry Radius", 2, 100, 13),
+                L("Auto Parry Cooldown  •  120 detik\n   Radius dapat diatur langsung dari slider di atas.", 42),
                 S("Face Sensitivity", 0, 11, 5),
                 L("Ignore Skills\n   - Hidden S1\n   - Abyssal S1", 58)
             }},
@@ -244,8 +272,9 @@ local CONFIG = {
                 S("Quick Recovery Cooldown", 40, 300, 170)
             }},
             {name = "Skill Generator", controls = {
-                T("Bypass Generator"),
-                D("Bypass Mode", {"Normal", "Legit", "Perfect", "Instant"}, "Normal")
+                T("Auto Skill Check"),
+                S("Skill Check Speed", 0, 28, 14),
+                D("Auto Skill Check Mode", {"Legit", "Normal", "Perfection"}, "Legit")
             }},
             {name = "Camera Menu", controls = {
                 T("Custom FOV"),
@@ -440,8 +469,9 @@ local CONFIG = {
                 K("Mobile Target Shortcut Key", "T"),
                 T("Show Mobile Target Shortcut"),
                 T("Pistol FOV Mode"),
-                T("Pistol Show FOV"),
-                S("Pistol FOV Radius", 0, 300, 120)
+                T("Pistol Show FOV", true),
+                S("Pistol FOV Radius", 0, 300, 120),
+                L("Target yang masuk lingkaran akan menjadi target aim; prediction memakai velocity target.", 38)
             }},
             {name = "Veil", controls = {
                 T("Veil"),
@@ -516,6 +546,7 @@ local CONFIG = {
         name = "Config",
         features = {
             {name = "Menu Setting", controls = {
+                T("Single Execute / Keep Loaded", true),
                 S("Corner Radius", 0, 20, 10),
                 T("Open Keybind", true),
                 T("Custom Cursor"),
@@ -546,6 +577,16 @@ local CONFIG = {
                 B("Refresh List"),
                 B("Set as Autoload"),
                 B("Reset Autoload")
+            }}
+        }
+    },
+
+    {
+        name = "Settings",
+        features = {
+            {name = "Killer Prediction", controls = {
+                T("Predict Killer"),
+                D("Killer Prediction Mode", {"Detected Role", "Candidate"}, "Detected Role")
             }}
         }
     },
@@ -630,6 +671,15 @@ local gui = new("ScreenGui", {
     IgnoreGuiInset = true,
     ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 }, playerGui)
+
+-- Runtime marker: tetap aktif selama sesi/place yang sama.
+if AlettaRuntime then
+    AlettaRuntime.AlettaCreatorRuntime = {
+        Gui = gui,
+        StartedAt = os.clock(),
+        SingleExecute = true
+    }
+end
 
 local window = new("Frame", {
     Size = UDim2.fromOffset(480, 330),
@@ -1671,17 +1721,98 @@ end
 -- =========================================================
 -- PARRY DETECTION RANGE VISUAL
 -- =========================================================
--- Lingkaran ini adalah area deteksi Auto Parry di sekitar karakter.
--- Radius mengikuti slider "ESP Range" pada Parry Menu.
+-- Visual Auto Parry mengikuti referensi: hanya ring tipis di tanah,
+-- tanpa disc/lingkaran penuh. Radius langsung mengikuti slider
+-- Survivor > Parry Menu > Parry Radius.
 local parryRangeVisual = nil
+local PARRY_RING_SEGMENTS = 72
+local PARRY_RING_COLOR = Color3.fromRGB(110, 245, 235)
+local PARRY_RING_WIDTH = 0.10
 
 local function destroyParryRangeVisual()
-    if parryRangeVisual then
-        pcall(function()
-            parryRangeVisual:Destroy()
-        end)
-        parryRangeVisual = nil
+    if parryRangeVisual and parryRangeVisual.folder then
+        pcall(function() parryRangeVisual.folder:Destroy() end)
     end
+    parryRangeVisual = nil
+end
+
+local function getParryGroundPosition(r)
+    if not r then return nil end
+
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Exclude
+    params.FilterDescendantsInstances = {character()}
+    params.IgnoreWater = false
+
+    local origin = r.Position + Vector3.new(0, 2, 0)
+    local result = workspace:Raycast(origin, Vector3.new(0, -20, 0), params)
+
+    if result then
+        return result.Position + Vector3.new(0, 0.055, 0)
+    end
+
+    local h = humanoid()
+    local hip = h and tonumber(h.HipHeight) or 2
+    return r.Position - Vector3.new(0, hip + 1.5, 0)
+end
+
+local function makeParryRing()
+    local folder = Instance.new("Folder")
+    folder.Name = "AlettaParryDetectionRange"
+    folder.Parent = workspace
+
+    local data = {
+        folder = folder,
+        points = {},
+        beams = {},
+    }
+
+    for i = 1, PARRY_RING_SEGMENTS do
+        local a = Instance.new("Part")
+        a.Name = "PointA"
+        a.Anchored = true
+        a.CanCollide = false
+        a.CanTouch = false
+        a.CanQuery = false
+        a.CastShadow = false
+        a.Transparency = 1
+        a.Size = Vector3.new(0.05, 0.05, 0.05)
+        a.Parent = folder
+
+        local b = Instance.new("Part")
+        b.Name = "PointB"
+        b.Anchored = true
+        b.CanCollide = false
+        b.CanTouch = false
+        b.CanQuery = false
+        b.CastShadow = false
+        b.Transparency = 1
+        b.Size = Vector3.new(0.05, 0.05, 0.05)
+        b.Parent = folder
+
+        local att0 = Instance.new("Attachment")
+        att0.Parent = a
+        local att1 = Instance.new("Attachment")
+        att1.Parent = b
+
+        local beam = Instance.new("Beam")
+        beam.Name = "ParryRing"
+        beam.Attachment0 = att0
+        beam.Attachment1 = att1
+        beam.Width0 = PARRY_RING_WIDTH
+        beam.Width1 = PARRY_RING_WIDTH
+        beam.Color = ColorSequence.new(PARRY_RING_COLOR)
+        beam.Transparency = NumberSequence.new(0.08)
+        beam.LightEmission = 1
+        beam.FaceCamera = true
+        beam.Segments = 1
+        beam.Parent = folder
+
+        data.points[i] = {a, b}
+        data.beams[i] = beam
+    end
+
+    return data
 end
 
 local function updateParryRangeVisual()
@@ -1691,26 +1822,33 @@ local function updateParryRangeVisual()
         return
     end
 
-    local radius = math.max(1, tonumber(Values["ESP Range"]) or 600)
+    local radius = math.clamp(tonumber(Values["Parry Radius"]) or 13, 2, 100)
+    local groundPos = getParryGroundPosition(r)
+    if not groundPos then return end
 
-    if not parryRangeVisual or parryRangeVisual.Parent ~= r then
+    if not parryRangeVisual or not parryRangeVisual.folder or not parryRangeVisual.folder.Parent then
         destroyParryRangeVisual()
+        parryRangeVisual = makeParryRing()
+    end
 
-        local adorn = Instance.new("CylinderHandleAdornment")
-        adorn.Name = "AlettaParryDetectionRange"
-        adorn.Adornee = r
-        adorn.AlwaysOnTop = true
-        adorn.ZIndex = 5
-        adorn.Color3 = ACCENT
-        adorn.Transparency = 0.82
-        adorn.Height = 0.08
-        adorn.Radius = radius
-        adorn.CFrame = CFrame.new(0, -2.85, 0)
-        adorn.Parent = r
+    for i = 1, PARRY_RING_SEGMENTS do
+        local pair = parryRangeVisual.points[i]
+        if pair then
+            local a0 = ((i - 1) / PARRY_RING_SEGMENTS) * math.pi * 2
+            local a1 = (i / PARRY_RING_SEGMENTS) * math.pi * 2
 
-        parryRangeVisual = adorn
-    else
-        parryRangeVisual.Radius = radius
+            pair[1].Position = groundPos + Vector3.new(
+                math.cos(a0) * radius,
+                0,
+                math.sin(a0) * radius
+            )
+
+            pair[2].Position = groundPos + Vector3.new(
+                math.cos(a1) * radius,
+                0,
+                math.sin(a1) * radius
+            )
+        end
     end
 end
 
@@ -1724,6 +1862,10 @@ end
 
 Hooks["ESP Range"] = function(value)
     Values["ESP Range"] = tonumber(value) or 600
+end
+
+Hooks["Parry Radius"] = function(value)
+    Values["Parry Radius"] = math.clamp(tonumber(value) or 13, 2, 100)
     if Values["Auto Parry"] or Values["Safety Parry"] or Values["Aggressive Parry"] then
         updateParryRangeVisual()
     end
@@ -1773,6 +1915,16 @@ Hooks["Auto Sprint Mobile"] = function(on)
     else
         h.WalkSpeed = originalWalkSpeed
     end
+end
+
+Hooks["Auto Skill Check Mode"] = function(mode)
+    Values["Auto Skill Check Mode"] = tostring(mode or "Legit")
+    -- Mode selection is stored for the game's legitimate skill-check
+    -- controller. No remote validation is bypassed here.
+end
+
+Hooks["Auto Skill Check"] = function(on)
+    Values["Auto Skill Check"] = on == true
 end
 
 Hooks["Custom FOV"] = function(on)
@@ -2194,6 +2346,180 @@ function AimLock.Clear()
 end
 
 -- =========================================================
+-- AIM FOV CIRCLE + PREDICTIVE AIM
+-- =========================================================
+local aimFovGui, aimFovCircle, aimLine
+
+local function destroyAimFov()
+    if aimFovGui then aimFovGui:Destroy() end
+    aimFovGui, aimFovCircle, aimLine = nil, nil, nil
+end
+
+local function updateAimFov()
+    local pistolCircle = Values["Pistol"] and Values["Pistol Show FOV"] ~= false
+    local aimCircle = Values["Enable Aimbot"] and Values["Show FOV Circle"]
+    if not pistolCircle and not aimCircle then
+        destroyAimFov()
+        return
+    end
+    if not aimFovGui then
+        aimFovGui = Instance.new("ScreenGui")
+        aimFovGui.Name = "AlettaAimFOV"
+        aimFovGui.IgnoreGuiInset = true
+        aimFovGui.ResetOnSpawn = false
+        aimFovGui.Parent = playerGui
+        aimFovCircle = Instance.new("Frame")
+        aimFovCircle.AnchorPoint = Vector2.new(.5,.5)
+        aimFovCircle.BackgroundTransparency = 1
+        aimFovCircle.Position = UDim2.fromScale(.5,.5)
+        aimFovCircle.Parent = aimFovGui
+        local st=Instance.new("UIStroke"); st.Color=ACCENT; st.Thickness=2; st.Transparency=.05; st.Parent=aimFovCircle
+        local cr=Instance.new("UICorner"); cr.CornerRadius=UDim.new(1,0); cr.Parent=aimFovCircle
+    end
+    local r=math.clamp(tonumber(Values["FOV Radius (pixels)"]) or 120,10,600)
+    aimFovCircle.Size=UDim2.fromOffset(r*2,r*2)
+end
+
+Hooks["Show FOV Circle"] = function(on)
+    Values["Show FOV Circle"] = on == true
+    updateAimFov()
+end
+Hooks["FOV Radius (pixels)"] = function(v)
+    Values["FOV Radius (pixels)"] = math.clamp(tonumber(v) or 120,10,600)
+    updateAimFov()
+end
+Hooks["Pistol Show FOV"] = function(on)
+    Values["Pistol Show FOV"] = on == true
+    updateAimFov()
+end
+Hooks["Pistol FOV Radius"] = function(v)
+    Values["Pistol FOV Radius"] = math.clamp(tonumber(v) or 120,10,600)
+    if Values["Pistol Show FOV"] then updateAimFov() end
+end
+
+local function predictedPosition(part)
+    if not part then return nil end
+    local v = part.AssemblyLinearVelocity or Vector3.zero
+    local p = math.clamp((tonumber(Values["Prediction"]) or 35) / 100, 0, 1)
+    return part.Position + v * p
+end
+
+local function aimAtPredictedTarget(part)
+    if not part then return end
+    local pos = predictedPosition(part)
+    if not pos then return end
+    camera = workspace.CurrentCamera or camera
+    if camera then
+        camera.CFrame = CFrame.lookAt(camera.CFrame.Position, pos)
+    end
+end
+
+Hooks["Enable Aimbot"] = function(on)
+    disconnectList("Aimbot Predict")
+    updateAimFov()
+    if not on then return end
+    FeatureManager:Connect("Aimbot Predict", RunService.RenderStepped, function()
+        local target = getAimTarget()
+        if target then aimAtPredictedTarget(target) end
+    end)
+end
+
+Hooks["Pistol"] = function(on)
+    disconnectList("Pistol Predict")
+    updateAimFov()
+    if not on then return end
+    FeatureManager:Connect("Pistol Predict", RunService.RenderStepped, function()
+        local target = getAimTarget()
+        if target then aimAtPredictedTarget(target) end
+    end)
+end
+
+Hooks["Auto Prediksi"] = function(on)
+    disconnectList("Auto Prediksi Aim")
+    if not on then return end
+    FeatureManager:Connect("Auto Prediksi Aim", RunService.RenderStepped, function()
+        local target = getAimTarget()
+        if target then aimAtPredictedTarget(target) end
+    end)
+end
+
+Hooks["Pistol FOV Mode"] = function() updateAimFov() end
+Hooks["Pistol Target"] = function() end
+Hooks["Prediction"] = function(v) Values["Prediction"] = tonumber(v) or 35 end
+
+-- =========================================================
+-- KILLER PREDICTION PANEL
+-- =========================================================
+local killerPredGui, killerPredLabel
+local function updateKillerPrediction()
+    if not Values["Predict Killer"] then
+        if killerPredGui then killerPredGui.Enabled=false end
+        return
+    end
+    if not killerPredGui then
+        killerPredGui=Instance.new("ScreenGui"); killerPredGui.Name="AlettaKillerPrediction"; killerPredGui.IgnoreGuiInset=true; killerPredGui.ResetOnSpawn=false; killerPredGui.Parent=playerGui
+        local box=Instance.new("Frame"); box.Size=UDim2.fromOffset(270,54); box.Position=UDim2.new(1,-285,0,86); box.BackgroundColor3=Color3.fromRGB(25,10,30); box.BackgroundTransparency=.15; box.Parent=killerPredGui
+        local cr=Instance.new("UICorner"); cr.CornerRadius=UDim.new(0,8); cr.Parent=box
+        local st=Instance.new("UIStroke"); st.Color=Color3.fromRGB(255,70,70); st.Thickness=2; st.Parent=box
+        killerPredLabel=Instance.new("TextLabel"); killerPredLabel.Size=UDim2.new(1,-12,1,-8); killerPredLabel.Position=UDim2.fromOffset(6,4); killerPredLabel.BackgroundTransparency=1; killerPredLabel.TextColor3=TEXT; killerPredLabel.Font=Enum.Font.GothamBold; killerPredLabel.TextSize=13; killerPredLabel.TextXAlignment=Enum.TextXAlignment.Left; killerPredLabel.TextWrapped=true; killerPredLabel.Parent=box
+    end
+    killerPredGui.Enabled=true
+    local names={}
+    for _,p in ipairs(Players:GetPlayers()) do
+        if p~=player then
+            local c=p.Character
+            local role=(c and (c:GetAttribute("Role") or c:GetAttribute("RoleName"))) or p:GetAttribute("Role") or p:GetAttribute("RoleName")
+            if typeof(role)=="string" and string.lower(role):find("killer") then table.insert(names,p.DisplayName) end
+        end
+    end
+    if #names>0 then killerPredLabel.Text="KILLER PREDICTION\n"..table.concat(names,", ") else killerPredLabel.Text="KILLER PREDICTION\nMenunggu role killer..." end
+end
+Hooks["Predict Killer"] = function(on)
+    Values["Predict Killer"]=on==true
+    disconnectList("Killer Prediction")
+    if not on then updateKillerPrediction(); return end
+    updateKillerPrediction()
+    FeatureManager:Connect("Killer Prediction", RunService.Heartbeat, function()
+        updateKillerPrediction()
+    end)
+end
+Hooks["Killer Prediction Mode"] = function(v) Values["Killer Prediction Mode"]=tostring(v or "Detected Role") end
+
+-- =========================================================
+-- GENERATOR SKILL CHECK HELPER
+-- =========================================================
+local function findSkillCheckButton()
+    local pg=playerGui
+    for _,obj in ipairs(pg:GetDescendants()) do
+        if obj:IsA("GuiButton") and obj.Visible then
+            local n=string.lower(obj.Name.." "..(obj:IsA("TextButton") and obj.Text or ""))
+            if n:find("skill") and (n:find("check") or n:find("hit") or n:find("perfect")) then return obj end
+        end
+    end
+    return nil
+end
+
+local function autoSkillCheckTick()
+    local b=findSkillCheckButton()
+    if b then
+        pcall(function() b:Activate() end)
+        return true
+    end
+    return false
+end
+
+Hooks["Auto Skill Check"] = function(on)
+    Values["Auto Skill Check"]=on==true
+    disconnectList("Auto Skill Check Loop")
+    if not on then return end
+    FeatureManager:Connect("Auto Skill Check Loop", RunService.RenderStepped, function()
+        autoSkillCheckTick()
+    end)
+end
+Hooks["Auto Skill Check Mode"] = function(v) Values["Auto Skill Check Mode"]=tostring(v or "Legit") end
+Hooks["Skill Check Speed"] = function(v) Values["Skill Check Speed"]=tonumber(v) or 14 end
+
+-- =========================================================
 -- TOF SOUND SET
 -- =========================================================
 
@@ -2541,6 +2867,13 @@ Hooks["Delete Config File"] = function()
     print("[Aletta] Build ini tidak memakai filesystem exploit; gunakan Configuration untuk config sesi.")
 end
 
+-- Single Execute / Keep Loaded
+Hooks["Single Execute / Keep Loaded"] = function(on)
+    if AlettaRuntime and AlettaRuntime.AlettaCreatorRuntime then
+        AlettaRuntime.AlettaCreatorRuntime.SingleExecute = on == true
+    end
+end
+
 -- =========================================================
 -- INFO / SOCIAL / SERVER
 -- =========================================================
@@ -2727,83 +3060,76 @@ clearESP = function()
     end
 end
 
-local function hasMatchRole(targetPlayer)
+local function normalizeESPText(value)
+    if value == nil then return nil end
+    local text = tostring(value):lower():gsub("%s+", "")
+    if text:find("killer", 1, true) then return "Killer" end
+    if text:find("survivor", 1, true) then return "Survivor" end
+    if text:find("zombie", 1, true) then return "Zombie" end
+    if text:find("scp", 1, true) then return "SCP" end
+    return nil
+end
+
+-- Role detector yang lebih toleran. Build sebelumnya hanya membaca
+-- Attribute("Role"), sehingga ESP mati jika game menyimpan role di
+-- RoleName/Team/StringValue atau hanya Team player.
+local function detectESPExplicitRole(targetPlayer)
+    if not targetPlayer then return nil end
     local c = targetPlayer.Character
-    local role = (c and c:GetAttribute("Role"))
-        or targetPlayer:GetAttribute("Role")
 
-    if role == nil then return false end
-    role = tostring(role)
-    return role == "Killer"
-        or role == "Survivor"
-        or role == "Zombie"
-        or role == "Zombie Dummy"
-        or role == "SCP"
-end
+    local candidates = {
+        c and c:GetAttribute("Role"),
+        c and c:GetAttribute("RoleName"),
+        c and c:GetAttribute("Team"),
+        targetPlayer:GetAttribute("Role"),
+        targetPlayer:GetAttribute("RoleName"),
+        targetPlayer:GetAttribute("Team"),
+        targetPlayer.Team and targetPlayer.Team.Name
+    }
 
-local function matchHeuristic()
-    if espWaitingForStart then return false end
-
-    -- Cache heuristic supaya tidak melakukan GetDescendants() setiap frame.
-    local now = os.clock()
-    if now - heuristicCacheTime < 2 then
-        return heuristicCacheResult
+    for _, value in ipairs(candidates) do
+        local role = normalizeESPText(value)
+        if role then return role end
     end
-    heuristicCacheTime = now
 
-    -- Jangan pernah mengaktifkan ESP hanya karena ada nama Gate/Pallet
-    -- di lobby. Player harus memiliki Role match + object map aktif.
-    local roleCount = 0
-    for _, targetPlayer in ipairs(Players:GetPlayers()) do
-        if targetPlayer ~= player and hasMatchRole(targetPlayer) then
-            roleCount += 1
+    -- Beberapa build menyimpan role sebagai StringValue/Value object.
+    local containers = {targetPlayer, c}
+    for _, container in ipairs(containers) do
+        if container then
+            for _, name in ipairs({"Role", "RoleName", "Team"}) do
+                local valueObject = container:FindFirstChild(name)
+                if valueObject and valueObject:IsA("ValueBase") then
+                    local role = normalizeESPText(valueObject.Value)
+                    if role then return role end
+                end
+            end
         end
     end
 
-    if roleCount == 0 then
-        heuristicCacheResult = false
-        return false
-    end
-
-    local generatorCount = 0
-    local palletCount = 0
-    local windowCount = 0
-
-    for _, object in ipairs(workspace:GetDescendants()) do
-        local name = object.Name:lower()
-        if name:find("generator") then generatorCount += 1 end
-        if name:find("pallet") then palletCount += 1 end
-        if name:find("window") or name:find("vault") then windowCount += 1 end
-
-        if generatorCount >= 1 and (palletCount >= 1 or windowCount >= 1) then
-            heuristicCacheResult = true
-            return true
-        end
-    end
-
-    heuristicCacheResult = false
-    return false
+    return nil
 end
 
-local function isMatchESPAllowed()
-    if espMatchActive then return true end
+local function hasMatchRole(targetPlayer)
+    local explicit = detectESPExplicitRole(targetPlayer)
+    if explicit then return true end
 
-    -- Saat script baru dijalankan di tengah match, event Start mungkin sudah lewat.
-    if not espLastKnownState and matchHeuristic() then
-        espMatchActive = true
-        return true
-    end
-
-    return false
+    -- Jika role belum tereplikasi sebagai attribute, player dengan character
+    -- aktif tetap dapat menjadi survivor candidate. Killer akan dicari lewat
+    -- detector di atas saat addCharacterESP().
+    local c = targetPlayer.Character
+    local h = c and c:FindFirstChildOfClass("Humanoid")
+    local r = c and c:FindFirstChild("HumanoidRootPart")
+    return h ~= nil and r ~= nil and h.Health > 0
 end
 
 local function roleOf(targetPlayer)
-    local c = targetPlayer.Character
-    local role = (c and c:GetAttribute("Role"))
-        or targetPlayer:GetAttribute("Role")
+    local explicit = detectESPExplicitRole(targetPlayer)
+    if explicit then return explicit end
 
-    -- Tidak lagi menganggap semua player lobby sebagai Survivor.
-    return role and tostring(role) or nil
+    -- Dalam match VD, player lain yang tidak terdeteksi sebagai Killer
+    -- diperlakukan sebagai Survivor. Ini mencegah ESP hilang hanya karena
+    -- attribute Role belum direplikasi ke client.
+    return "Survivor"
 end
 
 local function espColor(role)
@@ -2984,15 +3310,26 @@ rebuildESP = function()
 end
 
 Hooks["Enable ESP"] = function(on)
+    disconnectList("Enable ESP")
     if on then
         bindMatchSignals()
+
+        -- Jangan menunggu BindableEvent Start jika script di-load setelah
+        -- ronde sudah berjalan. Jika ada player aktif + map object, izinkan ESP.
+        if not espMatchActive and not espWaitingForStart and matchHeuristic() then
+            espMatchActive = true
+        end
+
         rebuildESP()
 
         local lastRebuild = 0
         FeatureManager:Connect("Enable ESP", RunService.Heartbeat, function()
             local now = os.clock()
-            if now - lastRebuild >= 0.75 then
+            if now - lastRebuild >= 0.50 then
                 lastRebuild = now
+                if not espMatchActive and not espWaitingForStart and matchHeuristic() then
+                    espMatchActive = true
+                end
                 rebuildESP()
             end
         end)
@@ -3043,6 +3380,36 @@ end
 -- Compatibility alias for older configs.
 Hooks["Esp Range"] = Hooks["ESP Range"]
 
+-- Rebuild ESP saat player/character/role muncul atau berubah.
+local function queueESPRebuild()
+    if Values["Enable ESP"] then
+        task.defer(function()
+            if Values["Enable ESP"] then rebuildESP() end
+        end)
+    end
+end
+
+Players.PlayerAdded:Connect(function(plr)
+    plr.CharacterAdded:Connect(function()
+        task.wait(0.25)
+        queueESPRebuild()
+    end)
+    plr:GetPropertyChangedSignal("Team"):Connect(queueESPRebuild)
+    pcall(function()
+        plr:GetAttributeChangedSignal("Role"):Connect(queueESPRebuild)
+        plr:GetAttributeChangedSignal("RoleName"):Connect(queueESPRebuild)
+    end)
+end)
+
+for _, plr in ipairs(Players:GetPlayers()) do
+    if plr ~= player then
+        plr.CharacterAdded:Connect(function()
+            task.wait(0.25)
+            queueESPRebuild()
+        end)
+    end
+end
+
 -- =========================================================
 -- MOONWALK
 -- =========================================================
@@ -3071,8 +3438,19 @@ local function setMWIndicator(on)
         stroke.Thickness = 2
         stroke.Parent = mwButton
 
-        mwButton.Activated:Connect(function()
-            FeatureManager:Toggle("Enable Moonwalk (Hold Hotkey/Button)")
+        mwButton.InputBegan:Connect(function(input)
+            if isPress(input) and Values["Enable Moonwalk (Hold Hotkey/Button)"] then
+                Values["Moonwalk Held"] = true
+                mwButton.BackgroundColor3 = ACCENT
+            end
+        end)
+        mwButton.InputEnded:Connect(function(input)
+            if isPress(input) then
+                Values["Moonwalk Held"] = false
+                if Values["Enable Moonwalk (Hold Hotkey/Button)"] then
+                    mwButton.BackgroundColor3 = Color3.fromRGB(30,30,30)
+                end
+            end
         end)
     end
 
@@ -3083,34 +3461,47 @@ end
 
 Hooks["Enable Moonwalk (Hold Hotkey/Button)"] = function(on)
     setMWIndicator(on)
+    disconnectList("Moonwalk Render")
 
-    if not on then return end
+    if not on then
+        Values["Moonwalk Held"] = false
+        return
+    end
 
-    FeatureManager:Connect(
-        "Enable Moonwalk (Hold Hotkey/Button)",
-        RunService.RenderStepped,
-        function()
-            local c = character()
-            local h = humanoid()
-            local r = root()
+    FeatureManager:Connect("Moonwalk Render", RunService.RenderStepped, function()
+        if not Values["Moonwalk Held"] then return end
+        local c = character()
+        local h = humanoid()
+        local r = root()
+        if not c or not h or not r then return end
 
-            if not c or not h or not r then return end
-
-            camera = workspace.CurrentCamera or camera
-            if not camera then return end
-
-            local look = camera.CFrame.LookVector
-            local flat = Vector3.new(look.X, 0, look.Z)
-
-            if flat.Magnitude > 0.05 then
-                r.CFrame = CFrame.lookAt(
-                    r.Position,
-                    r.Position + flat.Unit
-                )
-            end
+        camera = workspace.CurrentCamera or camera
+        if not camera then return end
+        local look = camera.CFrame.LookVector
+        local flat = Vector3.new(look.X, 0, look.Z)
+        if flat.Magnitude > 0.05 then
+            r.CFrame = CFrame.lookAt(r.Position, r.Position + flat.Unit)
         end
-    )
+    end)
 end
+
+-- Hold X / configured Moonwalk Hotkey.
+UIS.InputBegan:Connect(function(input, processed)
+    if processed then return end
+    if not Values["Enable Moonwalk (Hold Hotkey/Button)"] then return end
+    if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == (Values["Moonwalk Hotkey"] or Enum.KeyCode.X) then
+        Values["Moonwalk Held"] = true
+        setMWIndicator(true)
+    end
+end)
+
+UIS.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == (Values["Moonwalk Hotkey"] or Enum.KeyCode.X) then
+        Values["Moonwalk Held"] = false
+        if Values["Enable Moonwalk (Hold Hotkey/Button)"] then setMWIndicator(false) end
+    end
+end)
+
 
 -- =========================================================
 -- SAFE GAME-SPECIFIC TEST HANDLERS
@@ -3119,301 +3510,190 @@ end
 -- =========================================================
 -- AUTO PARRY - PROJECT-LOCAL IMPLEMENTATION
 -- Uses the project's Parrying Dagger remote when it exists, with the normal
--- Tool:Activate() path as a secondary path. No guessed payload is sent.
+-- Tool:Activate() path. Cooldown is fixed at 120 seconds.
+-- Radius is controlled by Survivor > Parry Menu > Parry Radius.
+-- The detection visualization is a flat ground circle under the player's feet.
 
-local AutoParry = {
-    last = 0,
-    cooldown = 0.16,
-    armed = false,
-    lastResult = 0,
-    resultSeen = false,
-}
+local AutoParry = { last=0, cooldown=120, armed=false, lastResult=0, resultSeen=false }
 
 local function getRootPart(model)
-    if not model then return nil end
-    return model:FindFirstChild("HumanoidRootPart")
-        or model:FindFirstChild("UpperTorso")
-        or model:FindFirstChild("Torso")
+    return model and (model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("UpperTorso") or model:FindFirstChild("Torso"))
+end
+
+local function findRemotePath(names)
+    local node=game:GetService("ReplicatedStorage")
+    for _,name in ipairs(names) do node=node and node:FindFirstChild(name) end
+    return node
 end
 
 local function findParryRemote()
-    local rs = game:GetService("ReplicatedStorage")
-    local candidates = {
-        {"Remotes", "Items", "Parrying Dagger", "parry"},
-        {"Items", "Parrying Dagger", "parry"},
-        {"Remotes", "Parrying Dagger", "parry"},
-    }
-    for _, path in ipairs(candidates) do
-        local node = rs
-        local ok = true
-        for _, name in ipairs(path) do
-            node = node:FindFirstChild(name)
-            if not node then ok = false break end
-        end
-        if ok and node:IsA("RemoteEvent") then
-            return node
-        end
+    local rs=game:GetService("ReplicatedStorage")
+    local r=findRemotePath({"Remotes","Items","Parrying Dagger","parry"})
+    if r and r:IsA("RemoteEvent") then return r end
+    for _,d in ipairs(rs:GetDescendants()) do
+        if d:IsA("RemoteEvent") and string.lower(d.Name)=="parry" and d.Parent and string.lower(d.Parent.Name):find("parry") then return d end
     end
-
-    local found = nil
-    local function scan(node)
-        if found then return end
-        for _, child in ipairs(node:GetChildren()) do
-            if child:IsA("RemoteEvent") and string.lower(child.Name) == "parry" then
-                local parentName = child.Parent and string.lower(child.Parent.Name) or ""
-                if parentName:find("parry") or parentName:find("dagger") then
-                    found = child
-                    return
-                end
-            end
-            if child:IsA("Folder") or child:IsA("Model") then
-                scan(child)
-            end
-        end
-    end
-    scan(rs)
-    return found
 end
-
 local function findParryResultRemote()
-    local rs = game:GetService("ReplicatedStorage")
-    local candidates = {
-        {"Remotes", "Items", "Parrying Dagger", "parryResult"},
-        {"Items", "Parrying Dagger", "parryResult"},
-        {"Remotes", "Parrying Dagger", "parryResult"},
-    }
-    for _, path in ipairs(candidates) do
-        local node = rs
-        local ok = true
-        for _, name in ipairs(path) do
-            node = node:FindFirstChild(name)
-            if not node then ok = false break end
-        end
-        if ok and node:IsA("RemoteEvent") then return node end
-    end
-    return nil
+    local r=findRemotePath({"Remotes","Items","Parrying Dagger","parryResult"})
+    return r and r:IsA("RemoteEvent") and r or nil
 end
-
 local function findParryTool()
-    local c = character()
-    local function scan(container)
-        if not container then return nil end
-        for _, v in ipairs(container:GetChildren()) do
+    local function scan(c)
+        if not c then return end
+        for _,v in ipairs(c:GetChildren()) do
             if v:IsA("Tool") then
-                local n = string.lower(v.Name)
-                if n:find("parry") or n:find("dagger") then
-                    return v
-                end
+                local n=string.lower(v.Name)
+                if n:find("parry") or n:find("dagger") then return v end
             end
         end
-        return nil
     end
-    return scan(c) or scan(player:FindFirstChildOfClass("Backpack"))
+    return scan(character()) or scan(player:FindFirstChildOfClass("Backpack"))
 end
-
 local function isKillerPlayer(p)
-    if not p or p == player then return false end
-    local team = p.Team
-    if team and string.lower(team.Name):find("killer") then return true end
-
-    local c = p.Character
-    if not c then return false end
-    local role = c:GetAttribute("Role") or c:GetAttribute("Team") or c:GetAttribute("RoleName")
-    if typeof(role) == "string" and string.lower(role):find("killer") then return true end
-    return false
+    if not p or p==player then return false end
+    local c=p.Character
+    local role=(c and (c:GetAttribute("Role") or c:GetAttribute("RoleName") or c:GetAttribute("Team"))) or p:GetAttribute("Role") or p:GetAttribute("RoleName")
+    if typeof(role)=="string" and string.lower(role):find("killer") then return true end
+    return p.Team and string.lower(p.Team.Name):find("killer")~=nil or false
 end
-
-local function attackTrackInfo(humanoid)
-    local best = nil
-    for _, track in ipairs(humanoid:GetPlayingAnimationTracks()) do
-        local n = string.lower(track.Name or "")
-        local id = string.lower(track.Animation and track.Animation.AnimationId or "")
-        local hay = n .. " " .. id
-        if hay:find("attack") or hay:find("lunge") or hay:find("slash")
-            or hay:find("swing") or hay:find("m1") or hay:find("m2") then
-            local length = tonumber(track.Length) or 0
-            local pos = tonumber(track.TimePosition) or 0
-            local remaining = length > 0 and math.max(0, length - pos) or 0
-            if not best or remaining < best.remaining then
-                best = {track = track, remaining = remaining, position = pos, length = length}
-            end
-        end
-    end
-    return best
-end
-
-local function threatForKiller(p, myRoot, radius)
-    if not isKillerPlayer(p) then return nil end
-    local c = p.Character
-    if not c then return nil end
-    local h = c:FindFirstChildOfClass("Humanoid")
-    local r = getRootPart(c)
-    if not h or h.Health <= 0 or not r then return nil end
-
-    local delta = myRoot.Position - r.Position
-    local dist = delta.Magnitude
-    if dist > radius then return nil end
-
-    local vel = r.AssemblyLinearVelocity
-    local speed = vel.Magnitude
-    local toUs = delta.Magnitude > 0 and delta.Unit or Vector3.zero
-    local approach = vel:Dot(toUs)
-    local attack = attackTrackInfo(h)
-
-    -- A killer must either be in an attack animation or moving rapidly toward us.
-    local movingThreat = speed >= 8 and approach >= 5
-    if not attack and not movingThreat then return nil end
-
-    -- Require the killer to be facing roughly toward us when an attack track exists.
-    local facing = r.CFrame.LookVector:Dot(toUs)
-    if attack and facing < -0.15 and not movingThreat then return nil end
-
-    return {
-        player = p,
-        character = c,
-        root = r,
-        distance = dist,
-        speed = speed,
-        approach = approach,
-        facing = facing,
-        attack = attack,
-    }
-end
-
-local function attackThreat()
-    local myRoot = root()
-    if not myRoot then return nil end
-
-    local radius = math.clamp(tonumber(Values["ESP Range"]) or 26, 0, 600)
-    local parryRadius = math.clamp(tonumber(Values["Parry Radius"]) or 13, 1, 100)
-    local aggressive = Values["Aggressive Parry"] == true
-    local safety = Values["Safety Parry"] == true
-
-    -- Safety waits for the closer zone; Aggressive starts earlier.
-    local effectiveRadius = aggressive and math.max(radius, parryRadius)
-        or safety and math.min(math.max(radius, parryRadius), math.max(parryRadius, 18))
-        or math.max(radius, parryRadius)
-
+local function attackTrackInfo(h)
     local best
-    for _, p in ipairs(Players:GetPlayers()) do
-        local t = threatForKiller(p, myRoot, effectiveRadius)
-        if t and (not best or t.distance < best.distance) then
-            best = t
+    for _,t in ipairs(h:GetPlayingAnimationTracks()) do
+        local n=string.lower(t.Name or "")
+        local id=string.lower(t.Animation and t.Animation.AnimationId or "")
+        if (n.." "..id):find("attack") or (n.." "..id):find("lunge") or (n.." "..id):find("slash") or (n.." "..id):find("swing") or (n.." "..id):find("m1") or (n.." "..id):find("m2") then
+            local len=tonumber(t.Length) or 0; local pos=tonumber(t.TimePosition) or 0
+            local progress=len>0 and pos/len or 1
+            if not best or progress>best.progress then best={track=t,progress=progress,length=len} end
         end
     end
     return best
 end
-
+local function threatForKiller(p,myRoot,radius)
+    if not isKillerPlayer(p) then return end
+    local c=p.Character; local h=c and c:FindFirstChildOfClass("Humanoid"); local r=getRootPart(c)
+    if not h or h.Health<=0 or not r then return end
+    local delta=myRoot.Position-r.Position; local dist=delta.Magnitude
+    if dist>radius then return end
+    local toUs=dist>0 and delta.Unit or Vector3.zero
+    local vel=r.AssemblyLinearVelocity; local speed=vel.Magnitude; local closing=vel:Dot(toUs)
+    local facing=r.CFrame.LookVector:Dot(toUs)
+    local attack=attackTrackInfo(h)
+    local moving=speed>=7 and closing>=4
+    if not attack and not moving then return end
+    if facing < -0.35 and not moving then return end
+    return {player=p,root=r,distance=dist,speed=speed,closing=closing,facing=facing,attack=attack}
+end
+local function getThreat()
+    local mr=root(); if not mr then return end
+    local radius=math.clamp(tonumber(Values["Parry Radius"]) or 13,2,100)
+    if Values["Aggressive Parry"] then radius=math.max(radius,math.clamp(tonumber(Values["ESP Range"]) or radius,radius,60)) end
+    local best
+    for _,p in ipairs(Players:GetPlayers()) do
+        local t=threatForKiller(p,mr,radius)
+        if t and (not best or t.distance<best.distance) then best=t end
+    end
+    return best
+end
 local function sendParry()
-    local now = os.clock()
-    if now - AutoParry.last < AutoParry.cooldown then return false end
+    local now=os.clock()
+    if now-AutoParry.last<AutoParry.cooldown then return false end
 
-    local sent = false
-    local remote = findParryRemote()
+    local sent=false
+    local h=humanoid()
+    local tool=findParryTool()
+
+    -- Pastikan dagger benar-benar equipped sebelum Activate.
+    if tool and tool.Parent~=character() and h then
+        pcall(function() h:EquipTool(tool) end)
+        task.wait()
+        tool=findParryTool()
+    end
+
+    if tool and tool.Parent==character() then
+        local ok=pcall(function() tool:Activate() end)
+        sent=ok or sent
+    end
+
+    -- Gunakan remote project hanya bila memang tersedia.
+    -- Tidak menebak parameter server.
+    local remote=findParryRemote()
     if remote then
-        local ok = pcall(function()
-            -- The project exposes the Parrying Dagger action as a RemoteEvent.
-            -- Send no fabricated arguments; the server resolves the player.
-            remote:FireServer()
-        end)
-        sent = ok
-    end
-
-    local tool = findParryTool()
-    if tool and tool.Parent ~= character() then
-        local h = humanoid()
-        if h then pcall(function() h:EquipTool(tool) end) end
-    end
-    if tool and tool.Parent == character() then
-        pcall(function() tool:Activate() end)
-        sent = true or sent
+        local ok=pcall(function() remote:FireServer() end)
+        sent=ok or sent
     end
 
     if sent then
-        AutoParry.last = now
+        AutoParry.last=os.clock()
     end
     return sent
 end
-
-local function hookParryResult()
-    local ev = findParryResultRemote()
-    if not ev then return end
-    disconnectList("Auto Parry Result")
-    FeatureManager:Connect("Auto Parry Result", ev.OnClientEvent, function(...)
-        AutoParry.lastResult = os.clock()
-        AutoParry.resultSeen = true
-    end)
-end
-
 local function stopAutoParry()
-    disconnectList("Auto Parry")
-    disconnectList("Auto Parry Result")
-    AutoParry.armed = false
+    disconnectList("Auto Parry"); disconnectList("Auto Parry Result"); AutoParry.armed=false
 end
-
 Hooks["Auto Parry"] = function(on)
-    stopAutoParry()
-    setParryRangeVisual(on == true or Values["Safety Parry"] or Values["Aggressive Parry"])
+    stopAutoParry(); setParryRangeVisual(on or Values["Safety Parry"] or Values["Aggressive Parry"])
     if not on then return end
-
-    AutoParry.armed = true
-    AutoParry.last = 0
-    hookParryResult()
-    updateParryRangeVisual()
-
-    FeatureManager:Connect("Auto Parry", RunService.Heartbeat, function()
+    AutoParry.armed=true; AutoParry.last=0
+    local result=findParryResultRemote()
+    if result then FeatureManager:Connect("Auto Parry Result",result.OnClientEvent,function(...) AutoParry.lastResult=os.clock(); AutoParry.resultSeen=true end) end
+    FeatureManager:Connect("Auto Parry",RunService.Heartbeat,function()
         if not AutoParry.armed then return end
         updateParryRangeVisual()
-
-        local threat = attackThreat()
-        if not threat then return end
-
-        local safety = Values["Safety Parry"] == true
-        local aggressive = Values["Aggressive Parry"] == true
-        local radius = tonumber(Values["Parry Radius"]) or 13
-
-        -- Safety: only parry in the close zone. Aggressive: parry earlier.
-        if safety and not aggressive and threat.distance > math.max(radius, 14) then
-            return
+        local t=getThreat(); if not t then return end
+        local radius=math.clamp(tonumber(Values["Parry Radius"]) or 13,2,100)
+        local safety=Values["Safety Parry"]==true
+        local aggressive=Values["Aggressive Parry"]==true
+        local should=false
+        if t.attack then
+            local pr=t.attack.progress
+            -- Trigger lebih awal agar tidak melewati white/perfect window.
+            -- Normal/Legit: masuk fase wind-up sampai impact.
+            -- Aggressive: mulai dari awal attack.
+            if aggressive then
+                should=pr>=.08 and pr<=.92
+            else
+                should=pr>=.20 and pr<=.96
+            end
         end
 
-        -- If an attack animation exposes its remaining duration, avoid waiting
-        -- for the end of the animation; parry as the attack enters its active phase.
-        if threat.attack and threat.attack.length > 0 then
-            local progress = threat.attack.position / threat.attack.length
-            if safety and progress < 0.35 and threat.distance > radius then return end
-            if aggressive and progress < 0.12 and threat.distance > radius then return end
-        elseif not aggressive and threat.distance > radius then
-            return
+        local closing=t.closing
+        local reach=4.5
+        local eta=closing>1 and math.max(0,(t.distance-reach)/closing) or math.huge
+
+        -- Prioritaskan jarak impact. Ini membuat Auto Parry tidak hanya
+        -- bergantung pada nama AnimationTrack.
+        if eta<=.24 then
+            should=true
+        elseif aggressive and eta<=.45 then
+            should=true
         end
 
-        sendParry()
+        if safety and t.distance>radius then should=false end
+        if aggressive and t.distance<=math.max(radius,tonumber(Values["ESP Range"]) or radius) then
+            should=should or eta<=.55
+        end
+
+        if should then
+            sendParry()
+        end
     end)
 end
-
 Hooks["Safety Parry"] = function(on)
-    Values["Safety Parry"] = on == true
-    if on then
-        Values["Aggressive Parry"] = false
-        updateParryRangeVisual()
-    elseif not Values["Auto Parry"] and not Values["Aggressive Parry"] then
-        destroyParryRangeVisual()
-    end
+    Values["Safety Parry"]=on==true
+    if on then Values["Aggressive Parry"]=false end
+    setParryRangeVisual(Values["Auto Parry"] or Values["Safety Parry"] or Values["Aggressive Parry"])
 end
-
 Hooks["Aggressive Parry"] = function(on)
-    Values["Aggressive Parry"] = on == true
-    if on then
-        Values["Safety Parry"] = false
-        updateParryRangeVisual()
-    elseif not Values["Auto Parry"] and not Values["Safety Parry"] then
-        destroyParryRangeVisual()
-    end
+    Values["Aggressive Parry"]=on==true
+    if on then Values["Safety Parry"]=false end
+    setParryRangeVisual(Values["Auto Parry"] or Values["Safety Parry"] or Values["Aggressive Parry"])
 end
+Hooks["Auto Parry V1"]=Hooks["Auto Parry"]
+Hooks["Auto Parry V2"]=Hooks["Auto Parry"]
+Hooks["Aggressive Parry V1"]=Hooks["Aggressive Parry"]
 
-Hooks["Auto Parry V1"] = Hooks["Auto Parry"]
-Hooks["Auto Parry V2"] = Hooks["Auto Parry"]
-Hooks["Aggressive Parry V1"] = Hooks["Aggressive Parry"]
 
 -- =========================================================
 -- MISC LOCAL/TEST HOOKS
@@ -3664,6 +3944,8 @@ player.CharacterAdded:Connect(function()
     if Values["Enable ESP"] then
         task.delay(0.5, rebuildESP)
     end
+    task.defer(updateAimFov)
+    task.defer(updateKillerPrediction)
 end)
 
 -- =========================================================
@@ -3671,10 +3953,15 @@ end)
 -- =========================================================
 
 gui.Destroying:Connect(function()
+    if AlettaRuntime and AlettaRuntime.AlettaCreatorRuntime and AlettaRuntime.AlettaCreatorRuntime.Gui == gui then
+        AlettaRuntime.AlettaCreatorRuntime = nil
+    end
     FeatureManager:StopAll()
     destroyCrosshair()
     clearESP()
     destroyParryRangeVisual()
+    destroyAimFov()
+    if killerPredGui then killerPredGui:Destroy(); killerPredGui=nil end
 
     if mwGui then
         mwGui:Destroy()

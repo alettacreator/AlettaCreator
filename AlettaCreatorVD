@@ -482,7 +482,7 @@ local CONFIG = {
                 K("Veil Hotkey", "V"),
                 T("Smart Predict Mode"),
                 S("Smart Predict Lead", 0, 50, 17),
-                T("Veil Show FOV", true),
+                T("Veil Show FOV", false),
                 T("Snapline", true),
                 S("Veil FOV Radius", 0, 300, 120),
                 S("Veil Distance", 0, 500, 150),
@@ -1794,25 +1794,30 @@ local function updateParryRangeVisual()
         disc.Parent = workspace
         parryRangeVisual = disc
 
-        -- Ring tipis di atas disc supaya batas radius mudah terlihat.
-        local ring = Instance.new("CylinderHandleAdornment")
+        -- Ring dibuat sebagai part datar di posisi ground yang sama.
+        -- Jangan memakai Adornee HumanoidRootPart karena offset dapat berubah
+        -- ketika HipHeight/rig berubah dan membuat radius terlihat salah.
+        local ring = Instance.new("Part")
         ring.Name = "AlettaParryDetectionRing"
-        ring.Adornee = r
-        ring.AlwaysOnTop = true
-        ring.ZIndex = 5
-        ring.Color3 = ACCENT
-        ring.Transparency = 0.18
-        ring.Height = 0.035
-        ring.Radius = radius
-        ring.CFrame = CFrame.new(0, -2.95, 0)
-        ring.Parent = r
+        ring.Anchored = true
+        ring.CanCollide = false
+        ring.CanTouch = false
+        ring.CanQuery = false
+        ring.CastShadow = false
+        ring.Material = Enum.Material.Neon
+        ring.Color = ACCENT
+        ring.Transparency = 0.20
+        ring.Shape = Enum.PartType.Cylinder
+        ring.Size = Vector3.new(radius * 2 + 0.10, 0.045, radius * 2 + 0.10)
+        ring.CFrame = CFrame.new(groundPos + Vector3.new(0, 0.025, 0))
+        ring.Parent = workspace
         parryRangeRing = ring
     else
         parryRangeVisual.Size = Vector3.new(radius * 2, 0.08, radius * 2)
         parryRangeVisual.CFrame = CFrame.new(groundPos)
         if parryRangeRing then
-            parryRangeRing.Radius = radius
-            parryRangeRing.CFrame = r.CFrame:ToObjectSpace(CFrame.new(groundPos))
+            parryRangeRing.Size = Vector3.new(radius * 2 + 0.10, 0.045, radius * 2 + 0.10)
+            parryRangeRing.CFrame = CFrame.new(groundPos + Vector3.new(0, 0.025, 0))
         end
     end
 end
@@ -2457,38 +2462,54 @@ end
 Hooks["Killer Prediction Mode"] = function(v) Values["Killer Prediction Mode"]=tostring(v or "Detected Role") end
 
 -- =========================================================
--- GENERATOR SKILL CHECK HELPER
+-- GENERATOR SKILL CHECK
 -- =========================================================
-local function findSkillCheckButton()
-    local pg=playerGui
-    for _,obj in ipairs(pg:GetDescendants()) do
-        if obj:IsA("GuiButton") and obj.Visible then
-            local n=string.lower(obj.Name.." "..(obj:IsA("TextButton") and obj.Text or ""))
-            if n:find("skill") and (n:find("check") or n:find("hit") or n:find("perfect")) then return obj end
+-- Versi lama menekan tombol setiap RenderStepped. Itu menyebabkan MISS
+-- karena tombol skill-check tidak berarti "tekan sekarang"; tombol harus
+-- dipicu saat jarum masuk zona target. Tanpa struktur GUI timing yang
+-- terbuka, jangan spam Activate(). Detektor di bawah hanya mencari kontrol
+-- skill-check yang eksplisit dan menekan paling banyak sekali per event.
+
+local skillCheckState={button=nil,lastPress=0,armed=false}
+
+local function findSkillCheckButtonSafe()
+    for _,obj in ipairs(playerGui:GetDescendants()) do
+        if obj:IsA("GuiButton") and obj.Visible and obj.Active then
+            local n=(obj.Name.." "..(obj:IsA("TextButton") and obj.Text or "")):lower()
+            if (n:find("skill",1,true) and (n:find("check",1,true) or n:find("hit",1,true)))
+                or n:find("skillcheck",1,true) then
+                return obj
+            end
         end
     end
     return nil
 end
 
-local function autoSkillCheckTick()
-    local b=findSkillCheckButton()
-    if b then
-        pcall(function() b:Activate() end)
-        return true
+local function skillCheckTick()
+    local b=findSkillCheckButtonSafe()
+    if not b then
+        skillCheckState.button=nil
+        skillCheckState.armed=false
+        return
     end
-    return false
+    if skillCheckState.button~=b then
+        skillCheckState.button=b
+        skillCheckState.armed=true
+    end
+    -- Do not blindly press every frame. Legit/Perfection requires the
+    -- game's timing controller or a detected target window.
 end
 
-Hooks["Auto Skill Check"] = function(on)
-    Values["Auto Skill Check"]=on==true
+Hooks["Auto Skill Check"]=function(on)
     disconnectList("Auto Skill Check Loop")
-    if not on then return end
-    FeatureManager:Connect("Auto Skill Check Loop", RunService.RenderStepped, function()
-        autoSkillCheckTick()
+    Values["Auto Skill Check"]=on==true
+    if not on then skillCheckState.button=nil; skillCheckState.armed=false; return end
+    FeatureManager:Connect("Auto Skill Check Loop",RunService.RenderStepped,function()
+        skillCheckTick()
     end)
 end
-Hooks["Auto Skill Check Mode"] = function(v) Values["Auto Skill Check Mode"]=tostring(v or "Legit") end
-Hooks["Skill Check Speed"] = function(v) Values["Skill Check Speed"]=tonumber(v) or 14 end
+Hooks["Auto Skill Check Mode"]=function(v) Values["Auto Skill Check Mode"]=tostring(v or "Legit") end
+Hooks["Skill Check Speed"]=function(v) Values["Skill Check Speed"]=tonumber(v) or 14 end
 
 -- =========================================================
 -- TOF SOUND SET
@@ -2925,461 +2946,355 @@ Hooks["Stop Emote"] = function()
 end
 
 -- =========================================================
--- ESP - MATCH ONLY
+-- ESP - VD MAP / PLAYER (FIXED)
 -- =========================================================
+-- Struktur VD yang sudah diverifikasi dari project:
+-- Workspace.Map
+--   Gate (2)
+--   Generator/Generator (7)
+--   Hook (8)
+--   Pallet (5)
+-- Teams: Survivors / Killer
+--
+-- Jangan memakai scan nama global sebagai sumber utama. Gunakan struktur map
+-- terlebih dahulu, lalu fallback descendant scan hanya bila folder runtime
+-- berubah karena streaming.
 
-espFolder = Instance.new("Folder")
+local espFolder = workspace:FindFirstChild("AlettaESP") or Instance.new("Folder")
 espFolder.Name = "AlettaESP"
 espFolder.Parent = workspace
 
-espGui = Instance.new("ScreenGui")
+local espGui = playerGui:FindFirstChild("AlettaESPLabels") or Instance.new("ScreenGui")
 espGui.Name = "AlettaESPLabels"
 espGui.ResetOnSpawn = false
 espGui.IgnoreGuiInset = true
+espGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
 espGui.Parent = playerGui
 
--- ESP sengaja tidak aktif di lobby/intermission.
--- Game.VD menyediakan BindableEvent Start/endgame/RoundEnd yang dipakai
--- sebagai sinyal match. Jika script dimuat di tengah match, heuristic
--- di bawah mencari Role yang benar-benar diberikan ke player + object map.
-local espMatchActive = false
-local espMatchConnections = {}
-local espLastKnownState = false
-local espWaitingForStart = false
-local clearESP
-local rebuildESP
-local heuristicCacheTime = 0
-local heuristicCacheResult = false
+local espObjects = {}
+local espPlayerObjects = {}
+local espDirty = true
 
-local function disconnectESPMatchSignals()
-    for _, connection in ipairs(espMatchConnections) do
-        pcall(function() connection:Disconnect() end)
-    end
-    table.clear(espMatchConnections)
-end
-
-local function setESPMatchActive(active)
-    active = active == true
-    espMatchActive = active
-    espLastKnownState = active
-    espWaitingForStart = not active
-    if not active and clearESP then
-        clearESP()
-    elseif active and Values["Enable ESP"] and rebuildESP then
-        task.defer(rebuildESP)
-    end
-end
-
-local function findGameFolder()
-    local replicated = game:GetService("ReplicatedStorage")
-    local remotes = replicated:FindFirstChild("Remotes")
-    if not remotes then return nil end
-    return remotes:FindFirstChild("Game")
-end
-
-local function bindMatchSignals()
-    disconnectESPMatchSignals()
-    local gameFolder = findGameFolder()
-    if not gameFolder then return end
-
-    local startEvent = gameFolder:FindFirstChild("Start")
-    local endEvent = gameFolder:FindFirstChild("endgame")
-    local roundEndEvent = gameFolder:FindFirstChild("RoundEndEvent")
-    local roundEnd = gameFolder:FindFirstChild("RoundEnd")
-    local endScreen = gameFolder:FindFirstChild("EndScreenEvent")
-
-    if startEvent and startEvent:IsA("BindableEvent") then
-        table.insert(espMatchConnections, startEvent.Event:Connect(function()
-            setESPMatchActive(true)
-        end))
-    end
-
-    for _, event in ipairs({endEvent, roundEndEvent, roundEnd, endScreen}) do
-        if event and event:IsA("BindableEvent") then
-            table.insert(espMatchConnections, event.Event:Connect(function()
-                setESPMatchActive(false)
-            end))
-        end
-    end
-end
-
-bindMatchSignals()
-
-local espColorMap = {
-    Survivor = Color3.fromRGB(70, 255, 100),   -- green
-    Killer = Color3.fromRGB(255, 60, 60),      -- red
-    Zombie = Color3.fromRGB(190, 70, 255),
-    SCP = Color3.fromRGB(190, 70, 255),
-    Generator = Color3.fromRGB(70, 140, 255),  -- blue
-    Gate = Color3.fromRGB(255, 255, 255),      -- white
-    Hook = Color3.fromRGB(255, 60, 60),        -- red
-    Pallet = Color3.fromRGB(255, 225, 60),     -- yellow
-    Window = Color3.fromRGB(255, 225, 60)      -- yellow
+local ESP_CONFIG = {
+    Generator = {color = Color3.fromRGB(70,140,255), enabled = "ESP Generator"},
+    Gate      = {color = Color3.fromRGB(255,255,255), enabled = "ESP Gate"},
+    Hook      = {color = Color3.fromRGB(255,60,60), enabled = "ESP Hook"},
+    Pallet    = {color = Color3.fromRGB(255,225,60), enabled = "ESP Pallet"},
+    Window    = {color = Color3.fromRGB(255,225,60), enabled = "ESP Window / Vault"},
 }
 
-clearESP = function()
-    if espFolder then
-        for _, object in ipairs(espFolder:GetChildren()) do
-            object:Destroy()
-        end
+local function getMap()
+    return workspace:FindFirstChild("Map")
+end
+
+local function getWorldPosition(obj)
+    if not obj then return nil end
+    if obj:IsA("BasePart") then return obj.Position end
+    if obj:IsA("Model") then
+        if obj.PrimaryPart then return obj.PrimaryPart.Position end
+        local p = obj:FindFirstChildWhichIsA("BasePart", true)
+        return p and p.Position or nil
     end
+    local p = obj:FindFirstChildWhichIsA("BasePart", true)
+    return p and p.Position or nil
+end
 
-    if espGui then
-        for _, object in ipairs(espGui:GetChildren()) do
-            object:Destroy()
-        end
+local function getAdornee(obj)
+    if not obj then return nil end
+    if obj:IsA("Model") then
+        return obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart", true)
+    elseif obj:IsA("BasePart") then
+        return obj
     end
+    return obj:FindFirstChildWhichIsA("BasePart", true)
 end
 
-local function normalizeESPText(value)
-    if value == nil then return nil end
-    local text = tostring(value):lower():gsub("%s+", "")
-    if text:find("killer", 1, true) then return "Killer" end
-    if text:find("survivor", 1, true) then return "Survivor" end
-    if text:find("zombie", 1, true) then return "Zombie" end
-    if text:find("scp", 1, true) then return "SCP" end
-    return nil
-end
-
--- Role detector yang lebih toleran. Build sebelumnya hanya membaca
--- Attribute("Role"), sehingga ESP mati jika game menyimpan role di
--- RoleName/Team/StringValue atau hanya Team player.
-local function detectESPExplicitRole(targetPlayer)
-    if not targetPlayer then return nil end
-    local c = targetPlayer.Character
-
-    local candidates = {
-        c and c:GetAttribute("Role"),
-        c and c:GetAttribute("RoleName"),
-        c and c:GetAttribute("Team"),
-        targetPlayer:GetAttribute("Role"),
-        targetPlayer:GetAttribute("RoleName"),
-        targetPlayer:GetAttribute("Team"),
-        targetPlayer.Team and targetPlayer.Team.Name
-    }
-
-    for _, value in ipairs(candidates) do
-        local role = normalizeESPText(value)
-        if role then return role end
-    end
-
-    -- Beberapa build menyimpan role sebagai StringValue/Value object.
-    local containers = {targetPlayer, c}
-    for _, container in ipairs(containers) do
-        if container then
-            for _, name in ipairs({"Role", "RoleName", "Team"}) do
-                local valueObject = container:FindFirstChild(name)
-                if valueObject and valueObject:IsA("ValueBase") then
-                    local role = normalizeESPText(valueObject.Value)
-                    if role then return role end
-                end
-            end
-        end
-    end
-
-    return nil
-end
-
-local function hasMatchRole(targetPlayer)
-    local explicit = detectESPExplicitRole(targetPlayer)
-    if explicit then return true end
-
-    -- Jika role belum tereplikasi sebagai attribute, player dengan character
-    -- aktif tetap dapat menjadi survivor candidate. Killer akan dicari lewat
-    -- detector di atas saat addCharacterESP().
-    local c = targetPlayer.Character
-    local h = c and c:FindFirstChildOfClass("Humanoid")
-    local r = c and c:FindFirstChild("HumanoidRootPart")
-    return h ~= nil and r ~= nil and h.Health > 0
-end
-
-local function roleOf(targetPlayer)
-    local explicit = detectESPExplicitRole(targetPlayer)
-    if explicit then return explicit end
-
-    -- Dalam match VD, player lain yang tidak terdeteksi sebagai Killer
-    -- diperlakukan sebagai Survivor. Ini mencegah ESP hilang hanya karena
-    -- attribute Role belum direplikasi ke client.
-    return "Survivor"
-end
-
-local function espColor(role)
-    if role == "Killer" then
-        return Color3.fromRGB(255, 60, 60)
-    elseif role == "Survivor" then
-        return Color3.fromRGB(70, 255, 100)
-    end
-    return espColorMap[role] or ACCENT
-end
-
-local function distanceAllowed(part)
+local function espDistanceAllowed(obj)
     local myRoot = root()
-    if not myRoot or not part then return true end
-    local maxDistance = tonumber(Values["ESP Distance"]) or 600
-    if maxDistance <= 0 then return true end
-    return (myRoot.Position - part.Position).Magnitude <= maxDistance
+    local pos = getWorldPosition(obj)
+    if not myRoot or not pos then return true end
+    local maxDistance = tonumber(Values["ESP Distance"] or Values["ESP Range"]) or 600
+    return maxDistance <= 0 or (myRoot.Position - pos).Magnitude <= maxDistance
 end
 
-local function espTransparency()
-    local value = tonumber(Values["ESP Transparency"]) or 2
-    return math.clamp(value / 11, 0, 1)
+local function clearESP()
+    for _, v in pairs(espObjects) do
+        if v.container and v.container.Parent then v.container:Destroy() end
+    end
+    table.clear(espObjects)
+    for _, v in pairs(espPlayerObjects) do
+        if v.highlight and v.highlight.Parent then v.highlight:Destroy() end
+        if v.billboard and v.billboard.Parent then v.billboard:Destroy() end
+    end
+    table.clear(espPlayerObjects)
+    for _, v in ipairs(espGui:GetChildren()) do v:Destroy() end
 end
 
-local function addCharacterESP(targetPlayer)
-    if not isMatchESPAllowed() then return end
-    if targetPlayer == player then return end
-
-    local c = targetPlayer.Character
-    local h = c and c:FindFirstChildOfClass("Humanoid")
-    local targetRoot = c and c:FindFirstChild("HumanoidRootPart")
-    local role = roleOf(targetPlayer)
-
-    -- Player lobby tanpa Role tidak boleh muncul.
-    if not c or not h or not targetRoot or h.Health <= 0 or not role then return end
-    if not distanceAllowed(targetRoot) then return end
-
-    -- Name/Distance ESP hanya untuk Killer dan Survivor.
-    -- Zombie/SCP tetap diberi highlight ungu, tetapi tanpa Name/Distance.
-    local isZombie = role == "Zombie" or role == "Zombie Dummy" or role == "SCP"
-    if role ~= "Killer" and role ~= "Survivor" and not isZombie then
-        return
-    end
-    if role == "Killer" and not Values["ESP Killer"] then return end
-    if role == "Survivor" and not Values["ESP Survivor"] then return end
-    if isZombie and Values["Target SCP / Zombie"] == false then return end
-
-    local color = isZombie and Color3.fromRGB(190, 70, 255) or espColor(role)
-    local transparency = espTransparency()
-
-    local highlight = Instance.new("Highlight")
-    highlight.Adornee = c
-    highlight.FillTransparency = math.max(0.82, transparency)
-    highlight.OutlineTransparency = 0
-    highlight.OutlineColor = color
-    highlight.FillColor = color
-    highlight.Parent = espFolder
-
-    if not isZombie and (Values["Show Name"]
-        or Values["Show Distance"]
-        or Values["Show Health"]) then
-
-        local billboard = Instance.new("BillboardGui")
-        billboard.Adornee = targetRoot
-        billboard.Size = UDim2.fromOffset(180, 45)
-        billboard.StudsOffset = Vector3.new(0, 3, 0)
-        billboard.AlwaysOnTop = true
-        billboard.Parent = espGui
-
-        local text = Instance.new("TextLabel")
-        text.BackgroundTransparency = 1
-        text.Size = UDim2.fromScale(1, 1)
-        text.Font = Enum.Font.GothamBold
-        text.TextSize = 12
-        text.TextColor3 = color
-        text.TextStrokeTransparency = 0.2
-        text.Parent = billboard
-
-        local parts = {}
-        if Values["Show Name"] then table.insert(parts, targetPlayer.Name) end
-        if Values["Show Health"] then
-            table.insert(parts, "[" .. math.floor(h.Health) .. " HP]")
-        end
-        if Values["Show Distance"] then
-            local myRoot = root()
-            if myRoot then
-                table.insert(parts, "[" .. math.floor(
-                    (myRoot.Position - targetRoot.Position).Magnitude
-                ) .. " M]")
-            end
-        end
-        text.Text = table.concat(parts, " ")
-    end
-end
-
-local function objectKind(object)
-    local name = object.Name:lower()
-
-    if name:find("generator") then
-        return "Generator"
-    elseif name:find("gate") or name:find("exit") then
-        return "Gate"
-    elseif name:find("hook") or name:find("scourge") then
-        return "Hook"
-    elseif name:find("pallet") then
-        return "Pallet"
-    elseif name:find("window") or name:find("vault") then
-        return "Window"
-    end
-
+local function normalizeRole(v)
+    if v == nil then return nil end
+    local s = tostring(v):lower():gsub("[%s_%-%."]", "")
+    if s:find("killer",1,true) then return "Killer" end
+    if s:find("survivor",1,true) then return "Survivor" end
+    if s:find("zombie",1,true) then return "Zombie" end
+    if s:find("scp",1,true) then return "SCP" end
     return nil
 end
 
-local function gateDisplayName(object)
-    local name = object.Name:lower()
-    if name:find("gate%s*1") or name:find("gate_1") or name:find("gate%-1") then
-        return "Gate 1"
-    elseif name:find("gate%s*2") or name:find("gate_2") or name:find("gate%-2") then
-        return "Gate 2"
+local function roleOfPlayer(plr)
+    if not plr then return nil end
+    local c = plr.Character
+    local candidates = {
+        c and c:GetAttribute("Role"), c and c:GetAttribute("RoleName"),
+        c and c:GetAttribute("Team"),
+        plr:GetAttribute("Role"), plr:GetAttribute("RoleName"),
+        plr:GetAttribute("Team"), plr.Team and plr.Team.Name,
+    }
+    for _, v in ipairs(candidates) do
+        local r = normalizeRole(v)
+        if r then return r end
     end
-    return "Gate"
-end
-
-local function addObjectESP(object, kind, gateIndex)
-    if not isMatchESPAllowed() then return end
-
-    if kind == "Generator" and not Values["ESP Generator"] then return end
-    if kind == "Gate" and not Values["ESP Gate"] then return end
-    if kind == "Hook" and not Values["ESP Hook"] then return end
-    if kind == "Pallet" and not Values["ESP Pallet"] then return end
-    if kind == "Window" and not Values["ESP Window / Vault"] then return end
-
-    local part = object:IsA("BasePart")
-        and object
-        or object:FindFirstChildWhichIsA("BasePart", true)
-    if not part or not distanceAllowed(part) then return end
-
-    -- Warna object ESP ditetapkan sesuai permintaan:
-    -- Generator = biru, Window/Vault = kuning, Pallet = kuning,
-    -- Hook = merah, Gate 1/2 = putih.
-    local color = espColorMap[kind] or ACCENT
-    local transparency = espTransparency()
-
-    local highlight = Instance.new("Highlight")
-    highlight.Adornee = object
-    highlight.FillTransparency = math.max(0.82, transparency)
-    highlight.OutlineTransparency = 0
-    highlight.OutlineColor = color
-    highlight.FillColor = color
-    highlight.Parent = espFolder
-
-    -- Object ESP tidak menampilkan Name/Distance.
-    -- Name/Distance hanya dipakai oleh addCharacterESP untuk Killer/Survivor.
-end
-
-rebuildESP = function()
-    clearESP()
-
-    if not Values["Enable ESP"] then return end
-    if not isMatchESPAllowed() then return end
-
-    for _, targetPlayer in ipairs(Players:GetPlayers()) do
-        addCharacterESP(targetPlayer)
-    end
-
-    local gateIndex = 0
-    for _, object in ipairs(workspace:GetDescendants()) do
-        local kind = objectKind(object)
-        if kind and (object:IsA("Model") or object:IsA("BasePart")) then
-            if kind == "Gate" then
-                gateIndex += 1
-                addObjectESP(object, kind, gateIndex)
-            else
-                addObjectESP(object, kind)
-            end
-        end
-    end
-end
-
-Hooks["Enable ESP"] = function(on)
-    disconnectList("Enable ESP")
-    if on then
-        bindMatchSignals()
-
-        -- Jangan menunggu BindableEvent Start jika script di-load setelah
-        -- ronde sudah berjalan. Jika ada player aktif + map object, izinkan ESP.
-        if not espMatchActive and not espWaitingForStart and matchHeuristic() then
-            espMatchActive = true
-        end
-
-        rebuildESP()
-
-        local lastRebuild = 0
-        FeatureManager:Connect("Enable ESP", RunService.Heartbeat, function()
-            local now = os.clock()
-            if now - lastRebuild >= 0.50 then
-                lastRebuild = now
-                if not espMatchActive and not espWaitingForStart and matchHeuristic() then
-                    espMatchActive = true
+    for _, container in ipairs({plr,c}) do
+        if container then
+            for _, name in ipairs({"Role","RoleName","Team"}) do
+                local x=container:FindFirstChild(name)
+                if x and x:IsA("ValueBase") then
+                    local r=normalizeRole(x.Value)
+                    if r then return r end
                 end
-                rebuildESP()
             end
-        end)
-    else
-        clearESP()
+        end
     end
+    return nil
 end
 
-for _, name in ipairs({
-    "ESP Survivor",
-    "ESP Killer",
-    "ESP Generator",
-    "ESP Gate",
-    "ESP Hook",
-    "ESP Pallet",
-    "ESP Window / Vault",
-    "Show Name",
-    "Show Distance",
-    "Show Health",
-    "ESP Distance",
-    "ESP Transparency",
-    "Survivor Color",
-    "Killer Color",
-    "Zombie Dummy Color",
-    "Generator Color",
-    "Gate Color",
-    "Hook Color",
-    "Pallet Color",
-    "Window / Vault Color"
-}) do
-    Hooks[name] = function()
-        if Values["Enable ESP"] then
-            rebuildESP()
+local function getMapObjects()
+    local map=getMap()
+    local out={map=map,generators={},hooks={},pallets={},gates={},windows={}}
+    if not map then return out end
+
+    local genFolder=map:FindFirstChild("Generator")
+    if genFolder then
+        for _,obj in ipairs(genFolder:GetChildren()) do
+            if obj.Name=="Generator" then table.insert(out.generators,obj) end
+        end
+    end
+    for _,obj in ipairs(map:GetChildren()) do
+        if obj.Name=="Hook" then table.insert(out.hooks,obj)
+        elseif obj.Name=="Pallet" then table.insert(out.pallets,obj)
+        elseif obj.Name=="Gate" then table.insert(out.gates,obj) end
+    end
+    for _,obj in ipairs(map:GetDescendants()) do
+        local n=obj.Name:lower()
+        if (n=="window" or n=="vault" or n:find("window",1,true) or n:find("vault",1,true))
+            and (obj:IsA("Model") or obj:IsA("BasePart")) then
+            table.insert(out.windows,obj)
+        end
+    end
+    return out
+end
+
+local function addObjectESP(obj,kind)
+    local cfg=ESP_CONFIG[kind]
+    if not cfg or Values[cfg.enabled]==false or not obj or not obj.Parent then return end
+    if not espDistanceAllowed(obj) then return end
+    if espObjects[obj] then return end
+    local adornee=getAdornee(obj)
+    if not adornee then return end
+
+    local container=Instance.new("Folder")
+    container.Name="ESP_"..kind
+    container.Parent=espFolder
+    local hl=Instance.new("Highlight")
+    hl.Name="Highlight"
+    hl.Adornee=obj:IsA("Model") and obj or adornee
+    hl.FillColor=cfg.color
+    hl.OutlineColor=cfg.color
+    hl.FillTransparency=0.78
+    hl.OutlineTransparency=0
+    hl.DepthMode=Enum.HighlightDepthMode.AlwaysOnTop
+    hl.Parent=container
+
+    local bill=Instance.new("BillboardGui")
+    bill.Name="Info"
+    bill.Adornee=adornee
+    bill.Size=UDim2.fromOffset(170,28)
+    bill.StudsOffset=Vector3.new(0,2.5,0)
+    bill.AlwaysOnTop=true
+    bill.MaxDistance=1000
+    bill.Enabled=Values["Show Name"] or Values["Show Distance"]
+    bill.Parent=container
+    local label=Instance.new("TextLabel")
+    label.BackgroundTransparency=1
+    label.Size=UDim2.fromScale(1,1)
+    label.Font=Enum.Font.GothamBold
+    label.TextSize=12
+    label.TextColor3=cfg.color
+    label.TextStrokeTransparency=.2
+    label.Parent=bill
+
+    espObjects[obj]={container=container,billboard=bill,label=label,adornee=adornee,kind=kind}
+end
+
+local function updateObjectESPLabels()
+    for obj,data in pairs(espObjects) do
+        if not obj.Parent then
+            if data.container then data.container:Destroy() end
+            espObjects[obj]=nil
+        else
+            local lines={}
+            if Values["Show Name"] then table.insert(lines,obj.Name) end
+            if Values["Show Distance"] then
+                local myRoot=root(); local pos=getWorldPosition(obj)
+                if myRoot and pos then table.insert(lines,string.format("[%dm]",math.floor((myRoot.Position-pos).Magnitude+.5))) end
+            end
+            data.label.Text=table.concat(lines," ")
+            data.billboard.Enabled=#lines>0
         end
     end
 end
 
--- Alias slider from Survivor > Parry Menu. It controls the same ESP distance.
-Hooks["ESP Range"] = function(value)
-    local n = math.clamp(tonumber(value) or 600, 0, 600)
-    Values["ESP Range"] = n
-    Values["ESP Distance"] = n
-    if Values["Enable ESP"] then
-        rebuildESP()
+local function addPlayerESP(plr)
+    if plr==player or not Values["Enable ESP"] then return end
+    local c=plr.Character
+    local h=c and c:FindFirstChildOfClass("Humanoid")
+    local r=c and c:FindFirstChild("HumanoidRootPart")
+    if not c or not h or not r or h.Health<=0 then return end
+    if not espDistanceAllowed(r) then return end
+    local role=roleOfPlayer(plr)
+
+    -- Fallback: only use Team/role data. Jangan menebak survivor jika role
+    -- sudah tidak jelas; ini mencegah killer diberi warna hijau.
+    if not role then return end
+    if role=="Killer" and not Values["ESP Killer"] then return end
+    if role=="Survivor" and not Values["ESP Survivor"] then return end
+    if role~="Killer" and role~="Survivor" then return end
+
+    local color=(role=="Killer") and Color3.fromRGB(255,60,60) or Color3.fromRGB(70,255,100)
+    local hl=Instance.new("Highlight")
+    hl.Name="AlettaPlayerESP"
+    hl.Adornee=c
+    hl.FillColor=color
+    hl.OutlineColor=color
+    hl.FillTransparency=.86
+    hl.OutlineTransparency=0
+    hl.DepthMode=Enum.HighlightDepthMode.AlwaysOnTop
+    hl.Parent=espFolder
+
+    local bill=Instance.new("BillboardGui")
+    bill.Name="AlettaPlayerInfo"
+    bill.Adornee=r
+    bill.Size=UDim2.fromOffset(190,42)
+    bill.StudsOffset=Vector3.new(0,3.1,0)
+    bill.AlwaysOnTop=true
+    bill.MaxDistance=1000
+    bill.Parent=espGui
+    local label=Instance.new("TextLabel")
+    label.BackgroundTransparency=1
+    label.Size=UDim2.fromScale(1,1)
+    label.Font=Enum.Font.GothamBold
+    label.TextSize=12
+    label.TextColor3=color
+    label.TextStrokeTransparency=.15
+    label.Parent=bill
+
+    espPlayerObjects[plr]={highlight=hl,billboard=bill,label=label,role=role,root=r,humanoid=h}
+end
+
+local function updatePlayerESP()
+    for plr,data in pairs(espPlayerObjects) do
+        local c=plr.Character
+        local r=c and c:FindFirstChild("HumanoidRootPart")
+        local h=c and c:FindFirstChildOfClass("Humanoid")
+        if not c or not r or not h or h.Health<=0 or not r.Parent then
+            if data.highlight then data.highlight:Destroy() end
+            if data.billboard then data.billboard:Destroy() end
+            espPlayerObjects[plr]=nil
+        else
+            local lines={}
+            if Values["Show Name"] then table.insert(lines,plr.DisplayName or plr.Name) end
+            if Values["Show Health"] then table.insert(lines,string.format("[%d HP]",math.floor(h.Health))) end
+            if Values["Show Distance"] then
+                local myRoot=root()
+                if myRoot then table.insert(lines,string.format("[%dm]",math.floor((myRoot.Position-r.Position).Magnitude+.5))) end
+            end
+            data.label.Text=table.concat(lines," ")
+            data.billboard.Enabled=#lines>0
+        end
     end
 end
 
--- Compatibility alias for older configs.
-Hooks["Esp Range"] = Hooks["ESP Range"]
+rebuildESP=function()
+    clearESP()
+    if not Values["Enable ESP"] then return end
+    local objects=getMapObjects()
+    for _,obj in ipairs(objects.generators) do addObjectESP(obj,"Generator") end
+    for _,obj in ipairs(objects.gates) do addObjectESP(obj,"Gate") end
+    for _,obj in ipairs(objects.hooks) do addObjectESP(obj,"Hook") end
+    for _,obj in ipairs(objects.pallets) do addObjectESP(obj,"Pallet") end
+    for _,obj in ipairs(objects.windows) do addObjectESP(obj,"Window") end
+    for _,plr in ipairs(Players:GetPlayers()) do addPlayerESP(plr) end
+    espDirty=false
+end
 
--- Rebuild ESP saat player/character/role muncul atau berubah.
-local function queueESPRebuild()
-    if Values["Enable ESP"] then
-        task.defer(function()
-            if Values["Enable ESP"] then rebuildESP() end
-        end)
+local function espLoopTick()
+    if not Values["Enable ESP"] then return end
+    if espDirty then rebuildESP() end
+    updateObjectESPLabels()
+    updatePlayerESP()
+end
+
+Hooks["Enable ESP"]=function(on)
+    disconnectList("Enable ESP")
+    Values["Enable ESP"]=on==true
+    if not on then clearESP(); return end
+    rebuildESP()
+    FeatureManager:Connect("Enable ESP",RunService.Heartbeat,function()
+        espLoopTick()
+    end)
+end
+
+for _,name in ipairs({
+    "ESP Survivor","ESP Killer","ESP Generator","ESP Gate","ESP Hook","ESP Pallet","ESP Window / Vault",
+    "Show Name","Show Distance","Show Health","ESP Distance","ESP Transparency",
+    "Survivor Color","Killer Color","Generator Color","Gate Color","Hook Color","Pallet Color","Window / Vault Color"
+}) do
+    Hooks[name]=function()
+        if Values["Enable ESP"] then espDirty=true; rebuildESP() end
     end
 end
+
+Hooks["ESP Range"]=function(value)
+    local n=math.clamp(tonumber(value) or 600,0,600)
+    Values["ESP Range"]=n
+    if Controls and Controls["ESP Distance"] and Controls["ESP Distance"].set then
+        pcall(Controls["ESP Distance"].set,n)
+    else
+        Values["ESP Distance"]=n
+    end
+    if Values["Enable ESP"] then espDirty=true; rebuildESP() end
+end
+Hooks["Esp Range"]=Hooks["ESP Range"]
 
 Players.PlayerAdded:Connect(function(plr)
     plr.CharacterAdded:Connect(function()
-        task.wait(0.25)
-        queueESPRebuild()
+        task.delay(.2,function() if Values["Enable ESP"] then espDirty=true end end)
     end)
-    plr:GetPropertyChangedSignal("Team"):Connect(queueESPRebuild)
     pcall(function()
-        plr:GetAttributeChangedSignal("Role"):Connect(queueESPRebuild)
-        plr:GetAttributeChangedSignal("RoleName"):Connect(queueESPRebuild)
+        plr:GetPropertyChangedSignal("Team"):Connect(function() if Values["Enable ESP"] then espDirty=true end end)
+        plr:GetAttributeChangedSignal("Role"):Connect(function() if Values["Enable ESP"] then espDirty=true end end)
+        plr:GetAttributeChangedSignal("RoleName"):Connect(function() if Values["Enable ESP"] then espDirty=true end end)
     end)
 end)
 
-for _, plr in ipairs(Players:GetPlayers()) do
-    if plr ~= player then
-        plr.CharacterAdded:Connect(function()
-            task.wait(0.25)
-            queueESPRebuild()
-        end)
+workspace.DescendantAdded:Connect(function(obj)
+    local n=obj.Name:lower()
+    if n=="generator" or n=="hook" or n=="pallet" or n=="gate" or n:find("window",1,true) or n:find("vault",1,true) then
+        espDirty=true
     end
-end
+end)
+workspace.DescendantRemoving:Connect(function(obj)
+    if espObjects[obj] then espDirty=true end
+end)
 
 -- =========================================================
 -- MOONWALK

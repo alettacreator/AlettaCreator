@@ -1721,9 +1721,11 @@ end
 -- =========================================================
 -- PARRY DETECTION RANGE VISUAL
 -- =========================================================
--- Lingkaran ini adalah area deteksi Auto Parry di sekitar karakter.
--- Radius mengikuti slider "ESP Range" pada Parry Menu.
+-- Area nyata 3D berbentuk LINGKARAN di tanah.
+-- Radius visual = radius Auto Parry, bukan ESP Range.
+-- Tidak memakai Frame/box ungu.
 local parryRangeVisual = nil
+local PARRY_RING_SEGMENTS = 48
 
 local function destroyParryRangeVisual()
     if parryRangeVisual then
@@ -1734,6 +1736,13 @@ local function destroyParryRangeVisual()
     end
 end
 
+local function makeParryRing()
+    local folder = Instance.new("Folder")
+    folder.Name = "AlettaParryDetectionCircle"
+    folder.Parent = workspace
+    return folder
+end
+
 local function updateParryRangeVisual()
     local r = root()
     if not r then
@@ -1741,26 +1750,48 @@ local function updateParryRangeVisual()
         return
     end
 
-    local radius = math.max(1, tonumber(Values["ESP Range"]) or 600)
+    -- INI radius area Auto Parry yang sebenarnya.
+    local radius = math.clamp(tonumber(Values["Parry Radius"]) or 13, 2, 60)
 
-    if not parryRangeVisual or parryRangeVisual.Parent ~= r then
+    if not parryRangeVisual or not parryRangeVisual.Parent then
         destroyParryRangeVisual()
+        parryRangeVisual = makeParryRing()
 
-        local adorn = Instance.new("CylinderHandleAdornment")
-        adorn.Name = "AlettaParryDetectionRange"
-        adorn.Adornee = r
-        adorn.AlwaysOnTop = true
-        adorn.ZIndex = 5
-        adorn.Color3 = ACCENT
-        adorn.Transparency = 0.82
-        adorn.Height = 0.08
-        adorn.Radius = radius
-        adorn.CFrame = CFrame.new(0, -2.85, 0)
-        adorn.Parent = r
+        for i = 1, PARRY_RING_SEGMENTS do
+            local segment = Instance.new("Part")
+            segment.Name = "RingSegment_" .. i
+            segment.Anchored = true
+            segment.CanCollide = false
+            segment.CanTouch = false
+            segment.CanQuery = false
+            segment.CastShadow = false
+            segment.Material = Enum.Material.Neon
+            segment.Color = ACCENT
+            segment.Transparency = 0.15
+            segment.Size = Vector3.new(0.09, 0.045, 1)
+            segment.Parent = parryRangeVisual
+        end
+    end
 
-        parryRangeVisual = adorn
-    else
-        parryRangeVisual.Radius = radius
+    local center = r.Position
+    local y = center.Y - 2.75
+    local circumference = 2 * math.pi * radius
+    local segmentLength = math.max(0.18, circumference / PARRY_RING_SEGMENTS * 1.12)
+
+    for i, segment in ipairs(parryRangeVisual:GetChildren()) do
+        if segment:IsA("BasePart") then
+            local angle = ((i - 1) / PARRY_RING_SEGMENTS) * math.pi * 2
+            local pos = Vector3.new(
+                center.X + math.cos(angle) * radius,
+                y,
+                center.Z + math.sin(angle) * radius
+            )
+
+            segment.Size = Vector3.new(0.09, 0.045, segmentLength)
+            segment.CFrame =
+                CFrame.new(pos)
+                * CFrame.Angles(0, -angle, 0)
+        end
     end
 end
 
@@ -1774,6 +1805,11 @@ end
 
 Hooks["ESP Range"] = function(value)
     Values["ESP Range"] = tonumber(value) or 600
+end
+
+Hooks["Parry Radius"] = function(value)
+    Values["Parry Radius"] = math.clamp(tonumber(value) or 13, 2, 60)
+
     if Values["Auto Parry"] or Values["Safety Parry"] or Values["Aggressive Parry"] then
         updateParryRangeVisual()
     end

@@ -96,6 +96,8 @@ Values["Show FOV Circle"] = true
 Values["FOV Radius (pixels)"] = 120
 Values["Predict Killer"] = false
 Values["Moonwalk Held"] = false
+Values["Veil Accurate Spear Prediction"] = false
+Values["Floatstance Fast Vault"] = false
 
 local Hooks = {}
 local Defaults = {}
@@ -257,6 +259,8 @@ local CONFIG = {
                 T("Auto Crouch Dodge"),
                 T("Auto Bandage"),
                 T("Auto Crouch Veil"),
+                T("Veil Accurate Spear Prediction"),
+                T("Floatstance Fast Vault"),
                 T("Anti Slow")
             }},
             {name = "Perks Mod", controls = {
@@ -483,7 +487,8 @@ local CONFIG = {
                 S("Veil FOV Radius", 0, 300, 120),
                 S("Veil Distance", 0, 500, 150),
                 S("Spear Speed", 0, 200, 165),
-                S("Spear Gravity", 0, 200, 103)
+                S("Spear Gravity", 0, 200, 103),
+                L("Veil Prediction: lead target berdasarkan velocity + arah gerak. Auto Crouch Veil hanya bereaksi jika trajectory tombak benar-benar mengarah ke survivor.", 58)
             }}
         }
     },
@@ -1860,21 +1865,27 @@ Hooks["Unlimited Zoom"] = function(on)
 end
 
 Hooks["Auto Sprint Mobile"] = function(on)
+    disconnectList("Auto Sprint Mobile")
     local h = humanoid()
     if not h then return end
-
-    -- Developer/test behavior: keep sprint state local and restore the
-    -- original WalkSpeed when disabled. Server-side movement validation
-    -- remains authoritative.
-    if on then
-        if Values["SpeedBoost"] then
-            h.WalkSpeed = tonumber(Values["Speed Boost Value"]) or h.WalkSpeed
-        else
-            h.WalkSpeed = math.max(h.WalkSpeed, 20)
-        end
-    else
+    if not on then
         h.WalkSpeed = originalWalkSpeed
+        return
     end
+
+    -- Mobile auto-sprint: sprint only while the mobile joystick is actually
+    -- producing movement. This avoids forcing sprint while standing still.
+    FeatureManager:Connect("Auto Sprint Mobile", RunService.Heartbeat, function()
+        local hh = humanoid()
+        if not hh then return end
+        local moving = hh.MoveDirection.Magnitude > 0.08
+        if moving then
+            local sprintSpeed = Values["SpeedBoost"] and tonumber(Values["Speed Boost Value"]) or 24
+            hh.WalkSpeed = math.max(tonumber(sprintSpeed) or 24, 16)
+        else
+            hh.WalkSpeed = originalWalkSpeed
+        end
+    end)
 end
 
 Hooks["Auto Skill Check Mode"] = function(mode)
@@ -3464,6 +3475,186 @@ end)
 
 
 -- =========================================================
+-- COMBINED SURVIVOR / VEIL MOVEMENT FEATURES
+-- =========================================================
+
+local function findNamedDescendant(rootObj, patterns)
+    if not rootObj then return nil end
+    for _,obj in ipairs(rootObj:GetDescendants()) do
+        local n=string.lower(obj.Name or "")
+        for _,pat in ipairs(patterns) do
+            if n:find(pat,1,true) then return obj end
+        end
+    end
+end
+
+local function tryActivateCrouchUI()
+    -- Prefer the game's own mobile/keyboard crouch control when it is exposed
+    -- in PlayerGui. No server RemoteEvent is guessed here.
+    local b=findNamedDescendant(playerGui,{"crouch","duck","slide"})
+    if b and b:IsA("GuiButton") and b.Visible then
+        pcall(function() b:Activate() end)
+        return true
+    end
+    return false
+end
+
+local localCrouchActive=false
+
+local function setLocalCrouch(on)
+    if localCrouchActive == on then return end
+    localCrouchActive=on
+    local h=humanoid()
+    if not h then return end
+    if on then
+        if tryActivateCrouchUI() then return end
+        if h:GetAttribute("AlettaOriginalHipHeight") == nil then
+            h:SetAttribute("AlettaOriginalHipHeight", h.HipHeight)
+        end
+        h.HipHeight=math.max(0, (tonumber(h:GetAttribute("AlettaOriginalHipHeight")) or h.HipHeight)-0.9)
+    else
+        local original=h:GetAttribute("AlettaOriginalHipHeight")
+        if typeof(original)=="number" then h.HipHeight=original end
+    end
+end
+
+local function getVeilKiller()
+    local myRoot=root(); if not myRoot then return nil end
+    local best
+    for _,p in ipairs(Players:GetPlayers()) do
+        if p~=player and isKillerPlayer(p) then
+            local c=p.Character; local h=c and c:FindFirstChildOfClass("Humanoid"); local r=getRootPart(c)
+            if h and h.Health>0 and r then
+                local d=(r.Position-myRoot.Position).Magnitude
+                if d <= (tonumber(Values["Veil Distance"]) or 150) and (not best or d<best.distance) then
+                    best={player=p,character=c,root=r,distance=d,humanoid=h}
+                end
+            end
+        end
+    end
+    return best
+end
+
+local function getVeilTargetPrediction(target)
+    if not target or not target.root then return nil end
+    local r=target.root
+    local speed=math.max(tonumber(Values["Spear Speed"]) or 165,1)
+    local lead=math.clamp((tonumber(Values["Smart Predict Lead"]) or 17)/100,0,1)
+    local v=r.AssemblyLinearVelocity or Vector3.zero
+    local dist=target.distance or 0
+    local flight=math.clamp(dist/speed,0,2)
+    -- Lead is scaled by projectile flight time so close targets are not
+    -- over-predicted while distant moving targets receive enough lead.
+    return r.Position + v * flight * lead
+end
+
+local function veilTargetInsideFOV(worldPos)
+    camera=workspace.CurrentCamera or camera
+    if not camera or not worldPos then return false end
+    local vp,onScreen=camera:WorldToViewportPoint(worldPos)
+    if not onScreen or vp.Z<=0 then return false end
+    local center=Vector2.new(camera.ViewportSize.X/2,camera.ViewportSize.Y/2)
+    local radius=tonumber(Values["Veil FOV Radius"]) or 120
+    return (Vector2.new(vp.X,vp.Y)-center).Magnitude <= radius
+end
+
+local function spearPartForKiller(killerCharacter)
+    if not killerCharacter then return nil end
+    local candidate=findNamedDescendant(killerCharacter,{"spear","veil","lance","javelin"})
+    if candidate and candidate:IsA("BasePart") then return candidate end
+    if candidate and candidate:IsA("Model") then return candidate.PrimaryPart or candidate:FindFirstChildWhichIsA("BasePart",true) end
+    local tool=killerCharacter:FindFirstChildOfClass("Tool")
+    if tool then
+        local n=string.lower(tool.Name)
+        if n:find("veil") or n:find("spear") or n:find("lance") then
+            return tool:FindFirstChildWhichIsA("BasePart",true)
+        end
+    end
+end
+
+local function spearTrajectoryThreatensUs()
+    local myRoot=root(); if not myRoot then return false end
+    local veil=getVeilKiller(); if not veil then return false end
+    local spear=spearPartForKiller(veil.character)
+    if not spear then return false end
+    local toUs=myRoot.Position-spear.Position
+    local dist=toUs.Magnitude
+    if dist<=0.1 then return true end
+    local dir=spear.CFrame.LookVector
+    local alignment=dir:Dot(toUs.Unit)
+    -- Only react when the spear is actually pointed substantially toward us.
+    if alignment < 0.82 then return false end
+    local lateral=(toUs - dir*toUs:Dot(dir)).Magnitude
+    local tolerance=math.clamp(2.0 + dist*0.04,2,6)
+    return lateral <= tolerance
+end
+
+Hooks["Veil Accurate Spear Prediction"] = function(on)
+    disconnectList("Veil Accurate Spear Prediction")
+    Values["Veil Accurate Spear Prediction"]=on==true
+    if not on then return end
+    FeatureManager:Connect("Veil Accurate Spear Prediction",RunService.RenderStepped,function()
+        local target=getVeilKiller()
+        if not target then return end
+        local predicted=getVeilTargetPrediction(target)
+        if not predicted or not veilTargetInsideFOV(predicted) then return end
+        _G.AlettaVeilPredictionTarget={player=target.player,position=predicted,time=os.clock()}
+        -- The predicted point is exposed to the project's legitimate Veil
+        -- controller; this script does not invent a FireServer payload.
+    end)
+end
+
+Hooks["Auto Crouch Veil"] = function(on)
+    disconnectList("Auto Crouch Veil")
+    if not on then setLocalCrouch(false); return end
+    FeatureManager:Connect("Auto Crouch Veil",RunService.Heartbeat,function()
+        if spearTrajectoryThreatensUs() then
+            setLocalCrouch(true)
+        else
+            setLocalCrouch(false)
+        end
+    end)
+end
+
+local function findFastVaultPrompt()
+    local myRoot=root(); if not myRoot then return nil end
+    local best,bestDist
+    for _,obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("ProximityPrompt") and obj.Enabled then
+            local n=string.lower((obj.Name or "").." "..(obj.ActionText or "").." "..(obj.ObjectText or ""))
+            if n:find("vault") or n:find("window") then
+                local parentPart=obj.Parent and (obj.Parent:IsA("BasePart") and obj.Parent or obj.Parent:FindFirstChildWhichIsA("BasePart",true))
+                if parentPart then
+                    local d=(parentPart.Position-myRoot.Position).Magnitude
+                    local forward=myRoot.CFrame.LookVector:Dot((parentPart.Position-myRoot.Position).Unit)
+                    if d<=7 and forward>0.35 and (not bestDist or d<bestDist) then best=obj; bestDist=d end
+                end
+            end
+        end
+    end
+    return best
+end
+
+Hooks["Floatstance Fast Vault"] = function(on)
+    disconnectList("Floatstance Fast Vault")
+    if not on then return end
+    FeatureManager:Connect("Floatstance Fast Vault",RunService.Heartbeat,function()
+        local h=humanoid(); if not h or h.Health<=0 then return end
+        if h.MoveDirection.Magnitude<0.15 then return end
+        local prompt=findFastVaultPrompt()
+        if prompt then
+            pcall(function() prompt:InputHoldBegin() end)
+            task.delay(math.max(0.05,tonumber(prompt.HoldDuration) or 0),function()
+                if prompt and prompt.Parent then pcall(function() prompt:InputHoldEnd() end) end
+            end)
+        end
+    end)
+end
+
+-- Aliases requested during the combined feature pass.
+Hooks["Perfect Vault"] = Hooks["Floatstance Fast Vault"]
+
+-- =========================================================
 -- SAFE GAME-SPECIFIC TEST HANDLERS
 -- =========================================================
 
@@ -3540,30 +3731,10 @@ local function threatForKiller(p,myRoot,radius)
     local vel=r.AssemblyLinearVelocity; local speed=vel.Magnitude; local closing=vel:Dot(toUs)
     local facing=r.CFrame.LookVector:Dot(toUs)
     local attack=attackTrackInfo(h)
-
-    -- Auto Parry harus benar-benar membaca serangan yang mengarah ke kita.
-    -- Sekadar Killer mendekat tidak cukup. Generator/skill-check tidak mematikan
-    -- heartbeat ini, sehingga Parry tetap bisa bekerja saat sedang repair.
-    if not attack then return end
-
-    -- Arah serangan: Killer harus menghadap cukup dekat ke posisi kita.
-    -- Nilai 0.35 ~= cone sekitar 69 derajat; gunakan posisi + velocity untuk
-    -- memberi toleransi kecil saat Killer sedang melakukan lunge/gerakan.
-    local directional = facing >= 0.35
-    local closingAttack = closing >= 2.5 and speed >= 4
-    if not directional and not closingAttack then return end
-
-    -- Pastikan posisi kita berada di depan Killer, bukan hanya radius radial.
-    -- Proyeksi lateral dipakai sebagai perkiraan lebar hitbox serangan.
-    local lateral = (toUs - r.CFrame.LookVector * facing).Magnitude
-    local hitWidth = 4.75
-    if lateral > hitWidth and not closingAttack then return end
-
-    return {
-        player=p, root=r, distance=dist, speed=speed, closing=closing,
-        facing=facing, lateral=lateral, attack=attack, directional=directional,
-        closingAttack=closingAttack
-    }
+    local moving=speed>=7 and closing>=4
+    if not attack and not moving then return end
+    if facing < -0.35 and not moving then return end
+    return {player=p,root=r,distance=dist,speed=speed,closing=closing,facing=facing,attack=attack}
 end
 local function getThreat()
     local mr=root(); if not mr then return end
@@ -3628,14 +3799,13 @@ Hooks["Auto Parry"] = function(on)
         local should=false
         if t.attack then
             local pr=t.attack.progress
-            -- Hanya parry ketika attack track aktif DAN arah Killer memang
-            -- mengarah ke kita. Ini mencegah parry palsu ketika Killer hanya
-            -- lewat/dekat generator.
-            local directional = t.directional == true or t.closingAttack == true
+            -- Trigger lebih awal agar tidak melewati white/perfect window.
+            -- Normal/Legit: masuk fase wind-up sampai impact.
+            -- Aggressive: mulai dari awal attack.
             if aggressive then
-                should=directional and pr>=.08 and pr<=.92
+                should=pr>=.08 and pr<=.92
             else
-                should=directional and pr>=.20 and pr<=.96
+                should=pr>=.20 and pr<=.96
             end
         end
 
@@ -3643,22 +3813,19 @@ Hooks["Auto Parry"] = function(on)
         local reach=4.5
         local eta=closing>1 and math.max(0,(t.distance-reach)/closing) or math.huge
 
-        -- Impact prediction hanya boleh mengaktifkan Parry jika attack aktif
-        -- dan target berada di jalur serangan. Tidak ada trigger dari gerakan
-        -- biasa/berlari menuju player.
-        if t.attack and (t.directional or t.closingAttack) and eta<=.24 then
+        -- Prioritaskan jarak impact. Ini membuat Auto Parry tidak hanya
+        -- bergantung pada nama AnimationTrack.
+        if eta<=.24 then
             should=true
-        elseif aggressive and t.attack and (t.directional or t.closingAttack) and eta<=.45 then
+        elseif aggressive and eta<=.45 then
             should=true
         end
 
         if safety and t.distance>radius then should=false end
         if aggressive and t.distance<=math.max(radius,tonumber(Values["ESP Range"]) or radius) then
-            should=should or (t.attack ~= nil and (t.directional or t.closingAttack) and eta<=.55)
+            should=should or eta<=.55
         end
 
-        -- Penting: proses generator/skill-check tidak menjadi syarat di sini.
-        -- Heartbeat Auto Parry tetap berjalan ketika player sedang repair.
         if should then
             sendParry()
         end
@@ -3823,6 +3990,8 @@ local gameSpecific = {
     "Auto Aim Senter ke Killer",
     "Auto Prediksi",
     "Veil",
+    "Veil Accurate Spear Prediction",
+    "Floatstance Fast Vault",
     "Enable Custom Animation",
     "Enable Avatar Changer",
     "Predict Killer",

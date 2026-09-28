@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Aletta Creator AI — Purple Anime Studio</title>
+<style>
+.theme-choice{position:relative;transition:.2s}
+.theme-choice:hover{transform:translateY(-2px);border-color:#a566ff;box-shadow:0 10px 30px rgba(155,92,255,.18)}
+.theme-choice.selected{border-color:#c78aff;box-shadow:0 0 0 2px rgba(199,138,255,.22),0 12px 32px rgba(155,92,255,.22)}
+.theme-choice.selected:after{content:"✓ AKTIF";position:absolute;right:9px;top:9px;background:#8f4fe0;color:#fff;padding:5px 7px;border-radius:999px;font-size:9px;font-weight:800;letter-spacing:.06em}
+
+:root{
+  --bg:#080511;--panel:#10091b;--panel2:#160d24;--line:#34204d;
+  --text:#f7f1ff;--muted:#a99ab9;--accent:#9b5cff;--accent2:#d69aff;
+  --pink:#ff72c8;--glow:rgba(155,92,255,.34);--radius:18px;
+}
+*{box-sizing:border-box} body{margin:0;background:
+radial-gradient(circle at 78% 8%,rgba(159,80,255,.24),transparent 28%),
+radial-gradient(circle at 20% 92%,rgba(255,75,193,.10),transparent 28%),var(--bg);
+color:var(--text);font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif;min-height:100vh}
+button,input,textarea{font:inherit}.app{display:flex;min-height:100vh}
+.sidebar{width:260px;background:rgba(10,6,17,.88);border-right:1px solid var(--line);padding:18px 14px;position:sticky;top:0;height:100vh;backdrop-filter:blur(18px)}
+.brand{display:flex;align-items:center;gap:11px;padding:8px 8px 18px}.logo{width:42px;height:42px;border-radius:14px;object-fit:cover;border:1px solid #7d4bd2;box-shadow:0 0 28px var(--glow)}
+.brand b{font-size:17px}.brand small{display:block;color:var(--muted);margin-top:2px}
+.nav{display:grid;gap:7px}.nav button{border:1px solid transparent;background:transparent;color:#c9bdd5;text-align:left;padding:12px 13px;border-radius:13px;cursor:pointer}
+.nav button:hover,.nav button.active{background:linear-gradient(90deg,rgba(155,92,255,.20),rgba(255,114,200,.06));border-color:#41285d;color:#fff}
+.spacer{height:18px}.mini{color:#7f708e;font-size:11px;text-transform:uppercase;letter-spacing:.12em;padding:0 9px 8px}
+.user{position:absolute;bottom:14px;left:14px;right:14px;padding:11px;border:1px solid var(--line);border-radius:15px;background:#10091a}
+.avatar{width:31px;height:31px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:8px}
+.main{flex:1;padding:24px;max-width:1500px;margin:auto;width:100%}
+.top{display:flex;justify-content:space-between;gap:16px;align-items:center;margin-bottom:18px}.pill{border:1px solid #4b2d68;border-radius:999px;padding:8px 12px;background:#130b20;color:#cdb9dd;font-size:12px}
+.hero{display:grid;grid-template-columns:1.15fr .85fr;gap:18px;margin-bottom:18px}
+.card{background:linear-gradient(145deg,rgba(24,13,39,.94),rgba(12,7,20,.96));border:1px solid var(--line);border-radius:22px;box-shadow:0 20px 70px rgba(0,0,0,.28);overflow:hidden}
+.heroCopy{padding:32px;min-height:310px;position:relative}.eyebrow{color:var(--accent2);font-size:12px;letter-spacing:.14em;text-transform:uppercase}
+h1{font-size:clamp(32px,4vw,58px);line-height:1.02;margin:12px 0}.gradient{background:linear-gradient(90deg,#fff,#d7b4ff 45%,#ff9edb);-webkit-background-clip:text;background-clip:text;color:transparent}
+.sub{color:#b9aac5;line-height:1.65;max-width:650px}.actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:22px}
+.btn{border:1px solid #4a2a69;border-radius:12px;background:#170c25;color:#fff;padding:11px 15px;cursor:pointer}.btn.primary{background:linear-gradient(135deg,#7c45d8,#bb65d7);border-color:#b778ff;box-shadow:0 0 24px rgba(155,92,255,.22)}
+.heroArt{min-height:310px;position:relative;background:#0a0610}.heroArt img{width:100%;height:100%;object-fit:cover;display:block;filter:saturate(1.05) contrast(1.03)}
+.artOverlay{position:absolute;inset:0;background:linear-gradient(90deg,rgba(9,5,15,.5),transparent 45%,rgba(10,5,17,.05))}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}.section{padding:20px}.section h2{font-size:18px;margin:0 0 5px}.hint{font-size:12px;color:var(--muted);margin-bottom:14px}
+.chat{height:590px;min-height:590px;display:flex;flex-direction:column;position:relative;overflow:hidden}
+.chat-theme-card{isolation:isolate}
+.chat-theme-bg{position:absolute;inset:0;z-index:0;overflow:hidden;background:linear-gradient(145deg,#11091b,#090510)}
+.chat-theme-bg img,.chat-theme-bg video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:none}
+.chat-theme-shade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(7,3,12,.52),rgba(8,4,14,.72) 55%,rgba(7,3,12,.88))}
+.chat-theme-card>h2,.chat-theme-card>.hint,.chat-theme-card>.messages,.chat-theme-card>.composer{position:relative;z-index:2}
+.chat-theme-card>h2{margin-top:0}
+.chat-theme-card>.hint{color:#d0c1da}
+.chat-theme-card>.messages{min-height:0}
+.chat-theme-card>.composer textarea{background:rgba(10,5,17,.76);backdrop-filter:blur(10px)}
+.chat-theme-card>.composer .btn{min-width:110px}
+.messages{flex:1;overflow:auto;padding:4px 2px 12px;display:grid;align-content:start;gap:10px}.msg{padding:11px 13px;border-radius:14px;max-width:88%;line-height:1.5;font-size:14px;background:rgba(16,8,26,.78);backdrop-filter:blur(9px);border-color:rgba(104,61,143,.55)}.ai{background:#171022;border:1px solid #34204d}.me{margin-left:auto;background:linear-gradient(135deg,#6d3ec1,#a052a0)}.composer{display:flex;gap:8px}.composer textarea{flex:1;resize:none;min-height:46px;max-height:110px;background:#0d0715;color:#fff;border:1px solid #38224f;border-radius:13px;padding:12px;outline:none}
+.tools{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.tool{padding:15px;border-radius:15px;border:1px solid #352047;background:#11091a;cursor:pointer}.tool b{display:block;margin-bottom:5px}.tool span{font-size:12px;color:var(--muted)}
+.gallery{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.gallery img{width:100%;aspect-ratio:3/4;object-fit:cover;border-radius:13px;border:1px solid #37204f;cursor:pointer;transition:.2s}.gallery img:hover{transform:translateY(-2px);border-color:#a566ff;box-shadow:0 10px 30px rgba(155,92,255,.18)}
+.themes{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.theme{padding:13px;border-radius:15px;border:1px solid #38234e;background:#100817;cursor:pointer}.swatch{height:55px;border-radius:11px;margin-bottom:9px}.theme small{color:#b8a9c4}.status{display:flex;gap:7px;align-items:center;color:#bcaec8;font-size:12px}.dot{width:7px;height:7px;border-radius:50%;background:#69e0a2;box-shadow:0 0 10px #69e0a2}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.7);display:none;place-items:center;padding:20px;z-index:20}.modal.show{display:grid}.modalBox{max-width:760px;width:100%;background:#100817;border:1px solid #482c62;border-radius:20px;padding:20px}.modalBox img{width:100%;max-height:70vh;object-fit:contain;border-radius:14px}
+.toast{position:fixed;right:18px;bottom:18px;padding:12px 15px;border:1px solid #4a2c67;background:#130b1e;border-radius:12px;display:none;z-index:30}.toast.show{display:block}
+.notice{margin-top:18px;padding:20px 22px;border:1px solid rgba(174,103,255,.48);border-radius:22px;background:linear-gradient(145deg,rgba(29,14,47,.96),rgba(12,7,21,.98));box-shadow:0 18px 55px rgba(92,42,145,.18),inset 0 0 28px rgba(155,92,255,.05);position:relative;overflow:hidden}.notice:before{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(circle at 92% 10%,rgba(214,154,255,.16),transparent 24%),radial-gradient(circle at 5% 100%,rgba(255,114,200,.08),transparent 28%)}.notice-inner{position:relative;display:flex;gap:14px;align-items:flex-start}.notice-icon{width:42px;height:42px;flex:0 0 42px;border-radius:14px;display:grid;place-items:center;background:rgba(155,92,255,.14);border:1px solid rgba(199,138,255,.42);box-shadow:0 0 22px rgba(155,92,255,.18);font-size:20px}.notice-title{margin:0 0 7px;color:#d69aff;font-size:16px;font-weight:800}.notice-text{margin:0;color:#d6c8e2;line-height:1.7;font-size:13px}.notice-text b{color:#f2d9ff}.notice-warning{margin-top:7px;color:#ffddf2}.notice-sign{margin-top:8px;color:#c78aff;font-weight:700}
+@media(max-width:900px){.sidebar{display:none}.main{padding:14px}.hero,.grid{grid-template-columns:1fr}.themes{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:520px){.chat{height:540px;min-height:540px}.chat-theme-card>.composer{gap:7px}.chat-theme-card>.composer .btn{min-width:92px}.heroCopy{padding:22px}.gallery{grid-template-columns:repeat(2,1fr)}.tools{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+</div>
+<div class="app">
+<aside class="sidebar">
+  <div class="brand"><img class="logo" src="assets/theme-3.jpg"><div><b>Aletta Creator</b><small>AI Studio</small></div></div>
+  <div class="mini">Workspace</div>
+  <div class="nav">
+    <button class="active" data-go="home">⌂ Dashboard</button>
+    <button data-go="chat">✦ AI Chat</button>
+    <button data-go="tools">⚡ Generate / Fix</button>
+    <button data-go="themes">◉ Theme Studio</button>
+    <button data-go="settings">⚙ Settings</button>
+  </div>
+  <div class="user"><img class="avatar" src="assets/theme-1.jpg"><b>Aletta</b><div class="status"><span class="dot"></span> Local AI workspace</div></div>
+</aside>
+
+<main class="main">
+  <div class="top"><div><b>Aletta Creator AI</b><div style="color:#897a96;font-size:12px">Purple Anime Aesthetic Edition</div></div><div class="pill">V5 • Theme saved locally</div></div>
+
+  <section id="home" class="card section" style="margin-bottom:18px">
+  <div class="eyebrow">ALETTA CREATOR AI</div>
+  <h1 style="font-size:clamp(28px,4vw,48px);margin:8px 0"><span class="gradient">Your AI. Your Theme.</span></h1>
+  <p class="sub" style="margin:0">Pilih tema di Theme Studio. Tema yang dipilih akan masuk langsung ke area AI Chat.</p>
+</section>
+
+<div class="grid">
+    <section id="chat" class="card section chat chat-theme-card">
+      <div class="chat-theme-bg" aria-hidden="true">
+        <img id="chatThemeImg" alt="">
+        <video id="chatThemeVideo" autoplay loop muted playsinline></video>
+        <div class="chat-theme-shade"></div>
+      </div>
+      <h2>AI Chat</h2><div class="hint">Terhubung ke Gemini AI melalui API Google ✨</div>
+      <div id="messages" class="messages">
+        <div class="msg ai">Halo, aku <b>Aletta Creator AI</b> ✨ Mau bikin desain, prompt, kode, atau memperbaiki project?</div>
+      </div>
+      <div class="composer"><textarea id="prompt" placeholder="Tulis pesan untuk Aletta..."></textarea><button class="btn primary" id="send">Kirim</button></div>
+    </section>
+
+    <section id="tools" class="card section">
+      <h2>Creator Tools</h2><div class="hint">Aksi cepat untuk workflow creator & developer.</div>
+      <div class="tools">
+        <div class="tool" onclick="demo('Generate')"><b>✦ Generate</b><span>Buat prompt / ide baru</span></div>
+        <div class="tool" onclick="demo('Explain')"><b>◎ Explain</b><span>Jelaskan kode atau konsep</span></div>
+        <div class="tool" onclick="demo('Fix')"><b>⚙ Fix</b><span>Analisis dan perbaiki error</span></div>
+        <div class="tool" onclick="demo('Developer')"><b>⌘ Developer</b><span>Workflow coding assistant</span></div>
+      </div>
+    </section>
+  </div>
+
+  <section id="themes" class="card section">
+  <h2>Theme Studio</h2>
+  <div class="hint">Pilih tema untuk menjadikannya <b>background chat/workspace</b>. Jika memilih video, background akan bergerak otomatis.</div>
+  <div class="themes" id="themeChoices">
+    <div class="theme theme-choice" data-theme="image-1" data-src="assets/theme-1.jpg" data-kind="image"><img src="assets/theme-1.jpg" style="width:100%;height:120px;object-fit:cover;border-radius:11px;margin-bottom:9px"><b>Violet Dream</b><br><small>Anime • Purple</small></div>
+    <div class="theme theme-choice" data-theme="image-2" data-src="assets/theme-2.jpg" data-kind="image"><img src="assets/theme-2.jpg" style="width:100%;height:120px;object-fit:cover;border-radius:11px;margin-bottom:9px"><b>Pink Secret</b><br><small>Anime • Pink</small></div>
+    <div class="theme theme-choice" data-theme="image-3" data-src="assets/theme-3.jpg" data-kind="image"><img src="assets/theme-3.jpg" style="width:100%;height:120px;object-fit:cover;border-radius:11px;margin-bottom:9px"><b>Purple Bride</b><br><small>Elegant • Violet</small></div>
+    <div class="theme theme-choice" data-theme="image-4" data-src="assets/theme-4.jpg" data-kind="image"><img src="assets/theme-4.jpg" style="width:100%;height:120px;object-fit:cover;border-radius:11px;margin-bottom:9px"><b>Lavender Glow</b><br><small>Fantasy • Glow</small></div>
+    <div class="theme theme-choice" data-theme="image-5" data-src="assets/theme-5.jpg" data-kind="image"><img src="assets/theme-5.jpg" style="width:100%;height:120px;object-fit:cover;border-radius:11px;margin-bottom:9px"><b>Pink City</b><br><small>Anime • Neon</small></div>
+    <div class="theme theme-choice" data-theme="image-6" data-src="assets/theme-6.jpg" data-kind="image"><img src="assets/theme-6.jpg" style="width:100%;height:120px;object-fit:cover;border-radius:11px;margin-bottom:9px"><b>Emerald Anime</b><br><small>Anime • Green Accent</small></div>
+    <div class="theme theme-choice" data-theme="video-1" data-src="assets/theme-video-1.mp4" data-kind="video"><video src="assets/theme-video-1.mp4" muted autoplay loop playsinline style="width:100%;height:120px;object-fit:cover;border-radius:11px;margin-bottom:9px"></video><b>Live Theme 01</b><br><small>Video • Moving</small></div>
+    <div class="theme theme-choice" data-theme="video-2" data-src="assets/theme-video-2.mp4" data-kind="video"><video src="assets/theme-video-2.mp4" muted autoplay loop playsinline style="width:100%;height:120px;object-fit:cover;border-radius:11px;margin-bottom:9px"></video><b>Live Theme 02</b><br><small>Video • Moving</small></div>
+    <div class="theme theme-choice" data-theme="video-3" data-src="assets/theme-video-3.mp4" data-kind="video"><video src="assets/theme-video-3.mp4" muted autoplay loop playsinline style="width:100%;height:120px;object-fit:cover;border-radius:11px;margin-bottom:9px"></video><b>Live Theme 03</b><br><small>Video • Moving</small></div>
+    <div class="theme theme-choice" data-theme="video-4" data-src="assets/theme-video-4.mp4" data-kind="video"><video src="assets/theme-video-4.mp4" muted autoplay loop playsinline style="width:100%;height:120px;object-fit:cover;border-radius:11px;margin-bottom:9px"></video><b>Live Theme 04</b><br><small>Video • Moving</small></div>
+  </div>
+  <div id="activeThemeLabel" style="margin-top:14px;padding:11px 13px;border:1px solid #3a2450;border-radius:12px;background:#100817;color:#cdbcdc;font-size:12px">Theme aktif: Default Purple</div>
+  <div id="settings" style="margin-top:18px;padding-top:15px;border-top:1px solid #30203f">
+    <h2>Settings</h2><div class="hint">Preferensi tema disimpan otomatis di browser.</div>
+    <label style="display:flex;gap:9px;align-items:center;color:#c7b8d1;font-size:13px"><input id="glow" type="checkbox" checked> Purple glow</label>
+    <button class="btn" style="margin-top:12px" onclick="clearChatTheme()">Kembalikan background default</button>
+  </div>
+</section>
+
+<section class="notice" aria-label="Pemberitahuan Aletta Creator">
+  <div class="notice-inner">
+    <div class="notice-icon">✦</div>
+    <div>
+      <h3 class="notice-title">Aletta Creator :</h3>
+      <p class="notice-text">Gunakan Aletta Creator AI dengan <b>memperluas/pembelajaran Coding, Script, Bug, dan lain-lain.</b></p>
+      <p class="notice-text notice-warning">⚠️ Jangan disalahgunakan untuk hal negatif.</p>
+      <p class="notice-text notice-sign">Semangat belajar-nya guiss ✨</p>
+    </div>
+  </div>
+</section>
+
+</main>
+</div>
+
+<div class="modal" id="modal" onclick="closeImg()"><div class="modalBox" onclick="event.stopPropagation()"><img id="modalImg"><button class="btn" style="margin-top:10px" onclick="closeImg()">Tutup</button></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+const root=document.documentElement;
+const palettes={
+ violet:{accent:'#9b5cff',accent2:'#d69aff',pink:'#ff72c8',glow:'rgba(155,92,255,.34)'},
+ midnight:{accent:'#7d4bd2',accent2:'#b18aff',pink:'#e08cff',glow:'rgba(125,75,210,.30)'},
+ lavender:{accent:'#a98aff',accent2:'#e5cfff',pink:'#ff9edb',glow:'rgba(169,138,255,.28)'},
+ pink:{accent:'#d35bb7',accent2:'#ff9bd9',pink:'#ff6bbd',glow:'rgba(211,91,183,.30)'}
+};
+function applyTheme(k){
+ const p=palettes[k]||palettes.violet;
+ Object.entries(p).forEach(([a,b])=>root.style.setProperty('--'+a,b));
+ localStorage.setItem('alettaTheme',k); toast('Tema '+k+' tersimpan ✨');
+}
+function setTheme(k){applyTheme(k)}
+function resetTheme(){applyTheme('violet');document.getElementById('glow').checked=true}
+const saved=localStorage.getItem('alettaTheme'); if(saved) applyTheme(saved);
+
+const chatThemeImg=document.getElementById('chatThemeImg');
+const chatThemeVideo=document.getElementById('chatThemeVideo');
+const activeThemeLabel=document.getElementById('activeThemeLabel');
+
+function selectChatTheme(kind,src,name){
+  chatThemeImg.style.display='none';
+  chatThemeVideo.pause();
+  chatThemeVideo.removeAttribute('src');
+  chatThemeVideo.load();
+  chatThemeVideo.style.display='none';
+
+  if(kind==='video'){
+    chatThemeVideo.src=src;
+    chatThemeVideo.muted=true;
+    chatThemeVideo.loop=true;
+    chatThemeVideo.autoplay=true;
+    chatThemeVideo.style.display='block';
+    chatThemeVideo.play().catch(()=>{});
+  }else{
+    chatThemeImg.src=src;
+    chatThemeImg.style.display='block';
+  }
+
+  document.querySelectorAll('.theme-choice').forEach(x=>x.classList.toggle('selected',x.dataset.src===src));
+  if(activeThemeLabel) activeThemeLabel.textContent='Theme aktif: '+name+(kind==='video'?' • LIVE VIDEO DI CHAT':' • IMAGE DI CHAT');
+  localStorage.setItem('alettaChatTheme',JSON.stringify({kind,src,name}));
+  toast('Theme '+name+' masuk ke AI Chat ✨');
+}
+
+document.querySelectorAll('.theme-choice').forEach(card=>{
+  card.addEventListener('click',()=>{
+    selectChatTheme(
+      card.dataset.kind,
+      card.dataset.src,
+      card.querySelector('b')?.textContent||'Custom Theme'
+    );
+    setTimeout(()=>scrollToId('chat'),80);
+  });
+});
+
+function clearChatTheme(){
+  localStorage.removeItem('alettaChatTheme');
+  chatThemeImg.style.display='none';
+  chatThemeVideo.pause();
+  chatThemeVideo.removeAttribute('src');
+  chatThemeVideo.load();
+  chatThemeVideo.style.display='none';
+  document.querySelectorAll('.theme-choice').forEach(x=>x.classList.remove('selected'));
+  if(activeThemeLabel) activeThemeLabel.textContent='Theme aktif: Default Purple';
+  toast('Background AI Chat dikembalikan');
+}
+
+try{
+  const t=JSON.parse(localStorage.getItem('alettaChatTheme')||'null');
+  if(t?.src) selectChatTheme(t.kind,t.src,t.name);
+}catch(e){}
+
+function scrollToId(id){document.getElementById(id)?.scrollIntoView({behavior:'smooth',block:'start'})}
+document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>scrollToId(b.dataset.go));
+function toast(t){const e=document.getElementById('toast');e.textContent=t;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),1700)}
+function openImg(src){document.getElementById('modalImg').src=src;document.getElementById('modal').classList.add('show')}
+function closeImg(){document.getElementById('modal').classList.remove('show')}
+function demo(name){document.getElementById('prompt').value=name+' — jelaskan kebutuhan saya dan bantu buat hasilnya.';scrollToId('chat');document.getElementById('prompt').focus()}
+function escapeHtml(text){return String(text).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#039;'}[c]))}
+function addMsg(text,cls){const d=document.createElement('div');d.className='msg '+cls;d.textContent=text;document.getElementById('messages').appendChild(d);document.getElementById('messages').scrollTop=99999;return d}
+function setSending(state){const b=document.getElementById('send');b.disabled=state;b.textContent=state?'Menjawab…':'Kirim'}
+function getChatHistory(){return [...document.querySelectorAll('#messages .msg')].map(el=>({role:el.classList.contains('me')?'user':'assistant',content:el.textContent}));}
+document.getElementById('send').onclick=async()=>{
+ const p=document.getElementById('prompt'),v=p.value.trim(); if(!v)return;
+ addMsg(v,'me');p.value='';setSending(true);
+ const thinking=addMsg('Aletta sedang berpikir…','ai');
+ try{
+   const history=getChatHistory().slice(-12);
+   history.pop();
+   const res=await fetch('/.netlify/functions/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:v,history})});
+   const data=await res.json().catch(()=>({}));
+   thinking.remove();
+   if(!res.ok) throw new Error(data.error||'Gagal menghubungi AI.');
+   addMsg(data.reply||'AI tidak mengembalikan jawaban.','ai');
+ }catch(err){
+   thinking.remove();
+   addMsg('⚠️ '+(err.message||'Terjadi kesalahan saat menghubungi Aletta AI.'),'ai');
+ }finally{setSending(false);p.focus()}
+};
+document.getElementById('prompt').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();document.getElementById('send').click()}});
+document.getElementById('glow').onchange=e=>{root.style.setProperty('--glow',e.target.checked?palettes[localStorage.getItem('alettaTheme')||'violet'].glow:'transparent')};
+</script>
+</body>
+</html>

@@ -1,0 +1,1561 @@
+--// Aletta Creator GUI - Fremium Edition
+--// Single LocalScript
+--// Dibersihkan dari:
+--// 1. FeatureManager:Toggle yang belum ada
+--// 2. pemanggilan Hooks"..." yang salah
+--// 3. emoji LOCK
+--// 4. tombol ^ -> asset gambar Aletta
+--// 5. moved global -> local
+--// 6. beberapa koneksi/cleanup yang rawan error
+--//
+--// Catatan:
+--// Fitur yang membutuhkan otorisasi server/game-specific tetap menjadi
+--// placeholder/test state. Jangan gunakan client untuk bypass validasi server.
+
+local Players = game:GetService("Players")
+local UIS = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local Lighting = game:GetService("Lighting")
+local TeleportService = game:GetService("TeleportService")
+local GuiService = game:GetService("GuiService")
+local VirtualUser = game:GetService("VirtualUser")
+
+local player = Players.LocalPlayer
+if not player then
+    warn("[Aletta] LocalPlayer belum tersedia.")
+    return
+end
+
+local playerGui = player:WaitForChild("PlayerGui", 15)
+if not playerGui then
+    warn("[Aletta] PlayerGui tidak ditemukan.")
+    return
+end
+
+local camera = workspace.CurrentCamera
+
+local ACCENT = Color3.fromRGB(150, 80, 255)
+local GRAY = Color3.fromRGB(175, 175, 175)
+local OFF = Color3.fromRGB(70, 70, 70)
+local BG = Color3.fromRGB(14, 10, 22)
+local PANEL = Color3.fromRGB(20, 16, 30)
+local FIELD = Color3.fromRGB(38, 30, 54)
+local TEXT = Color3.fromRGB(255, 255, 255)
+
+-- Asset gambar tombol buka/tutup GUI.
+local BACKGROUND_ID = "rbxassetid://114593611204629"
+local LOGO_ID = "rbxassetid://79108447755192"
+local HEADER_LOGO_ID = "rbxassetid://122038427201250"
+local LOAD_SOUND_ID = "rbxassetid://83169454697282"
+local ICON_ID = LOGO_ID
+
+-- Hapus GUI lama jika script dijalankan ulang.
+for _, name in ipairs({"AlettaCreatorGUI", "AlettaCrosshair", "AlettaESPLabels", "AlettaMWIndicator"}) do
+    local old = playerGui:FindFirstChild(name)
+    if old then
+        old:Destroy()
+    end
+end
+
+local Values = {}
+Values["Auto Skill Check Mode"] = "Legit"
+Values["Auto Skill Check"] = false
+Values["Auto Sprint Mobile"] = false
+
+local Hooks = {}
+local Defaults = {}
+local Controls = {}
+local FeatureConnections = {}
+
+local function disconnectList(name)
+    local list = FeatureConnections[name]
+    if not list then return end
+
+    for _, connection in ipairs(list) do
+        if connection and connection.Disconnect then
+            pcall(function()
+                connection:Disconnect()
+            end)
+        end
+    end
+
+    FeatureConnections[name] = nil
+end
+
+local function addConnection(name, connection)
+    if not connection then return nil end
+    FeatureConnections[name] = FeatureConnections[name] or {}
+    table.insert(FeatureConnections[name], connection)
+    return connection
+end
+
+local FeatureManager = {}
+
+function FeatureManager:Set(name, enabled)
+    enabled = enabled == true
+    Values[name] = enabled
+
+    disconnectList(name)
+
+    local hook = Hooks[name]
+    if hook then
+        task.spawn(function()
+            local ok, err = pcall(hook, enabled)
+            if not ok then
+                warn("[Aletta] " .. tostring(name) .. ": " .. tostring(err))
+            end
+        end)
+    end
+end
+
+function FeatureManager:Get(name)
+    return Values[name] == true
+end
+
+function FeatureManager:Toggle(name)
+    self:Set(name, not self:Get(name))
+end
+
+function FeatureManager:Stop(name)
+    self:Set(name, false)
+end
+
+function FeatureManager:Connect(name, signal, callback)
+    if signal and signal.Connect then
+        return addConnection(name, signal:Connect(callback))
+    end
+end
+
+function FeatureManager:StopAll()
+    local names = {}
+    for name in pairs(FeatureConnections) do
+        table.insert(names, name)
+    end
+    for _, name in ipairs(names) do
+        disconnectList(name)
+    end
+end
+
+local function T(label, default)
+    return {type = "toggle", label = label, default = default == true}
+end
+
+local function I(label, default, placeholder)
+    return {
+        type = "input",
+        label = label,
+        default = tostring(default or ""),
+        placeholder = placeholder
+    }
+end
+
+local function D(label, options, default)
+    return {type = "dropdown", label = label, options = options, default = default}
+end
+
+local function K(label, default)
+    return {type = "hotkey", label = label, default = default}
+end
+
+local function B(label)
+    return {type = "button", label = label}
+end
+
+local function L(text, height)
+    return {type = "label", label = text, height = height}
+end
+
+local function S(label, min, max, default)
+    return {type = "slider", label = label, min = min, max = max, default = default}
+end
+
+local function C(label, name)
+    local d = "Default " .. name
+    return D(label, {"Default " .. name, "Red", "Green", "Blue", "Purple", "White", "Yellow", "Orange"}, d)
+end
+
+local function TC(label, default)
+    return D(label, {"Purple", "Cyan", "Red", "Yellow", "Orange", "Blue", "Green", "White", "Pink"}, default)
+end
+
+-- =========================================================
+-- CONFIG GUI
+-- =========================================================
+
+local CONFIG = {
+    {
+        name = "Main",
+        features = {
+            {name = "Support Features", controls = {
+                T("No Fishing Animation"),
+                T("Auto Equip Rod"),
+                T("Bypass Radar"),
+                T("Lock Position"),
+                T("Show Real Ping Panel"),
+                T("Disable Cutscenes")
+            }},
+            {name = "Stable Result", controls = {
+                D("Stable Result", {"Off", "Good", "Perfection"}, "Good")
+            }},
+            {name = "Skip Rarity", controls = {
+                D("Target Rarity", {"None", "Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic", "SECRET"}, "None"),
+                T("Enable Skip Rarity")
+            }},
+            {name = "Legit Fishing", controls = {
+                I("Shake Delay", "0.05", "0.05"),
+                T("Enable Legit Fishing"),
+                T("Auto Shake")
+            }},
+            {name = "Instant Fishing", controls = {
+                D("Instant Mode", {"Normal", "Perfect"}, "Normal"),
+                I("Instant Delay", "0.04", "0.04"),
+                T("Enable Instant")
+            }},
+            {name = "Instant Fast Reel [BETA]", controls = {
+                D("Fast Reel Mode", {"Normal", "Perfect"}, "Normal"),
+                I("Fishing Complete Delay", "0.30", "0.30"),
+                T("Enable Ultra Blatant"),
+                T("Instant Fast Reel")
+            }},
+            {name = "Blatant V2 [BETA]", controls = {
+                T("Enable Blatant V2"),
+                I("Spam Cast Delay V2", "0.05", "0.05"),
+                I("Complete Delay V2", "0.01", "0.01")
+            }},
+            {name = "Perfect Rod/Bait Crafting", controls = {
+                L("Perfect Zone: gunakan crafting pada timing terbaik untuk hasil yang lebih stabil.", 46),
+                T("Enable Auto Perfect Crafting")
+            }}
+        }
+    },
+    {
+        name = "Favorite",
+        features = {
+            {name = "Auto Favorite", controls = {
+                T("Auto Favorite"),
+                I("Filter Name", "", "Masukkan nama..."),
+                D("Filter Variant", {"None", "8-Bit", "Abyssal", "Albino", "Arctic Frost", "Aurora", "Binary", "Bloodmoon"}, "None"),
+                D("Filter Rarity", {"None", "Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic", "SECRET"}, "None"),
+                L("Logic filter: AND — semua filter yang terisi harus cocok. Filter kosong diabaikan.", 42)
+            }},
+            {name = "Un-Favorite", controls = {
+                I("Unfav Name", "", "Masukkan nama..."),
+                D("Unfav Variant", {"None", "8-Bit", "Abyssal", "Albino", "Arctic Frost", "Aurora", "Binary", "Bloodmoon"}, "None"),
+                D("Unfav Rarity", {"None", "Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic", "SECRET"}, "None")
+            }},
+            {name = "Special Favorite", controls = {
+                T("Auto Favorite Ruby (Gemstone)"),
+                T("Auto Favorite Legendary (Crystalized)"),
+                T("Auto Favorite Equipment")
+            }},
+            {name = "Equipment", controls = {
+                I("Equip Name", "", "Masukkan nama..."),
+                D("Equip Variant", {"None", "8-Bit", "Abyssal", "Albino", "Arctic Frost", "Aurora", "Binary", "Bloodmoon"}, "None"),
+                D("Equip Rarity", {"None", "Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic", "SECRET"}, "None"),
+                L("Contoh: Gears, Enchant Stone, Transcend Stone, Trophies, Equipment.", 40)
+            }}
+        }
+    },
+    {
+        name = "Teleport",
+        features = {
+            {name = "Teleport to Island", controls = {
+                D("Select Island", {"Fisherman Island", "Ocean", "Tropical Grove", "Kohana Island", "Kohana Volcano", "Coral Reefs", "Crater Island", "Esoteric Depths", "Lost Isle", "Sisyphus Statue", "Treasure Room", "Ancient Jungle", "Sacred Temple", "Pirate Cove", "Crystal Depths", "Pirate Treasure Room", "Arcadia"}, "Fisherman Island"),
+                B("Teleport to Island"),
+                B("Refresh Island List")
+            }},
+            {name = "Teleport to Player", controls = {
+                D("Select Player", {"Refresh Player List"}, "Refresh Player List"),
+                B("Teleport to Selected Player"),
+                B("Refresh Player List")
+            }},
+            {name = "Saved Location", controls = {
+                B("Save Current Location"),
+                B("Teleport to Saved"),
+                B("Reset Saved Location"),
+                T("Auto Teleport on Spawn")
+            }},
+            {name = "Event Teleport", controls = {
+                D("Select Event", {"Refresh Event List"}, "Refresh Event List"),
+                T("Priority Event"),
+                B("Refresh Event List"),
+                T("Auto Event Teleport")
+            }},
+            {name = "Teleport to NPC", controls = {
+                D("Select NPC", {"Refresh NPC List"}, "Refresh NPC List"),
+                B("Teleport to NPC"),
+                B("Refresh NPC List")
+            }}
+        }
+    },
+    {
+        name = "Shop",
+        features = {
+            {name = "Shop", controls = {
+                T("Auto Buy"),
+                D("Shop Item", {"All Items", "Rod", "Bait", "Equipment", "Gemstone", "Other"}, "All Items"),
+                I("Buy Amount", "1", "Jumlah"),
+                B("Buy Now"),
+                B("Refresh Shop")
+            }}
+        }
+    },
+    {
+        name = "Automation",
+        features = {
+            {name = "Fishing Automation", controls = {
+                T("Auto Fish"),
+                T("Auto Shake"),
+                T("Auto Reel"),
+                T("Auto Equip Best Rod"),
+                T("Auto Equip Best Bait"),
+                T("Auto Sell"),
+                T("Auto Repair Rod")
+            }},
+            {name = "Automation Settings", controls = {
+                S("Automation Delay", 0, 20, 5),
+                D("Fish Mode", {"Legit", "Normal", "Fast", "Perfect"}, "Normal"),
+                T("Auto Reconnect"),
+                T("Anti AFK")
+            }}
+        }
+    },
+    {
+        name = "Trade",
+        features = {
+            {name = "Trade", controls = {
+                T("Auto Accept Trade"),
+                T("Auto Send Trade"),
+                D("Trade Player", {"Refresh Player List"}, "Refresh Player List"),
+                I("Trade Item", "", "Masukkan item..."),
+                B("Refresh Trade List")
+            }},
+            {name = "Trade Settings", controls = {
+                T("Confirm Before Trade"),
+                T("Block Unknown Trade")
+            }}
+        }
+    },
+    {
+        name = "Webhook",
+        features = {
+            {name = "Webhook", controls = {
+                T("Enable Webhook"),
+                I("Webhook URL", "", "Masukkan webhook URL..."),
+                D("Webhook Event", {"Fish Caught", "Rare Fish", "Legendary", "Mythic", "SECRET", "Event"}, "Fish Caught"),
+                T("Notify Rare Only"),
+                B("Test Webhook"),
+                B("Save Webhook")
+            }},
+            {name = "Webhook Filter", controls = {
+                D("Webhook Rarity", {"All", "Rare", "Epic", "Legendary", "Mythic", "SECRET"}, "All"),
+                T("Include Player Name"),
+                T("Include Fish Variant")
+            }}
+        }
+    }
+}
+
+-- =========================================================
+-- GUI HELPERS
+-- =========================================================
+
+local function new(className, props, parent)
+    local object = Instance.new(className)
+
+    for key, value in pairs(props or {}) do
+        pcall(function()
+            object[key] = value
+        end)
+    end
+
+    object.Parent = parent
+    return object
+end
+
+local cornerObjects = {}
+
+local function corner(object, radius)
+    local c = new("UICorner", {
+        CornerRadius = UDim.new(0, radius)
+    }, object)
+    table.insert(cornerObjects, c)
+    return c
+end
+
+local function isPress(input)
+    return input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch
+end
+
+local function isMove(input)
+    return input.UserInputType == Enum.UserInputType.MouseMovement
+        or input.UserInputType == Enum.UserInputType.Touch
+end
+
+-- =========================================================
+-- MAIN WINDOW
+-- =========================================================
+
+local gui = new("ScreenGui", {
+    Name = "AlettaCreatorGUI",
+    ResetOnSpawn = false,
+    IgnoreGuiInset = true,
+    ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+}, playerGui)
+
+local window = new("Frame", {
+    Size = UDim2.fromOffset(480, 330),
+    Position = UDim2.fromOffset(120, 80),
+    BackgroundColor3 = BG,
+    BorderSizePixel = 0,
+    ClipsDescendants = true
+}, gui)
+corner(window, 10)
+
+local wStroke = new("UIStroke", {
+    Color = Color3.new(1, 1, 1),
+    Thickness = 2
+}, window)
+
+new("UIGradient", {
+    Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(120, 60, 255)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(200, 90, 255)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(90, 40, 200))
+    }),
+    Rotation = 45
+}, wStroke)
+
+--// Purple background + Aletta logo composition
+local bgImg = new("ImageLabel", {
+    Name = "AlettaBackgroundArt",
+    Image = BACKGROUND_ID,
+    ImageTransparency = 0.12,
+    ScaleType = Enum.ScaleType.Crop,
+    BackgroundTransparency = 1,
+    Size = UDim2.fromScale(1, 1),
+    Active = false,
+    ZIndex = 0
+}, window)
+corner(bgImg, 10)
+
+local bgDark = new("Frame", {
+    Name = "AlettaBackgroundTint",
+    Size = UDim2.fromScale(1, 1),
+    BackgroundColor3 = Color3.fromRGB(8, 3, 18),
+    BackgroundTransparency = 0.34,
+    BorderSizePixel = 0,
+    Active = false,
+    ZIndex = 1
+}, window)
+corner(bgDark, 10)
+
+local top = new("Frame", {
+    Size = UDim2.new(1, 0, 0, 48),
+    BackgroundTransparency = 1,
+    ZIndex = 10
+}, window)
+
+local headerLogo = new("ImageLabel", {
+    Name = "AlettaHeaderLogo",
+    Image = HEADER_LOGO_ID,
+    ScaleType = Enum.ScaleType.Fit,
+    BackgroundTransparency = 1,
+    Position = UDim2.fromOffset(10, 1),
+    Size = UDim2.fromOffset(230, 46),
+    ZIndex = 11
+}, top)
+
+new("TextLabel", {
+    Text = "Fish It - Fremium Edition",
+    Font = Enum.Font.GothamBold,
+    TextSize = 12,
+    TextColor3 = TEXT,
+    BackgroundTransparency = 1,
+    Position = UDim2.fromOffset(250, 0),
+    Size = UDim2.fromOffset(200, 40),
+    TextXAlignment = Enum.TextXAlignment.Left
+}, top)
+
+local minBtn = new("TextButton", {
+    Text = "–",
+    Font = Enum.Font.GothamBold,
+    TextSize = 20,
+    TextColor3 = TEXT,
+    BackgroundColor3 = PANEL,
+    BackgroundTransparency = 0.3,
+    Size = UDim2.fromOffset(28, 26),
+    Position = UDim2.new(1, -38, 0, 7)
+}, top)
+corner(minBtn, 6)
+
+local side = new("ScrollingFrame", {
+    Position = UDim2.fromOffset(8, 48),
+    Size = UDim2.fromOffset(150, 274),
+    BackgroundTransparency = 1,
+    ZIndex = 10,
+    ScrollBarThickness = 0,
+    BorderSizePixel = 0,
+    CanvasSize = UDim2.new(),
+    AutomaticCanvasSize = Enum.AutomaticSize.Y
+}, window)
+
+new("UIListLayout", {
+    Padding = UDim.new(0, 4),
+    SortOrder = Enum.SortOrder.LayoutOrder
+}, side)
+
+-- Tidak menggunakan emoji search.
+local search = new("TextBox", {
+    PlaceholderText = "Search feature...",
+    Text = "",
+    Font = Enum.Font.Gotham,
+    TextSize = 13,
+    TextColor3 = TEXT,
+    PlaceholderColor3 = Color3.fromRGB(150, 150, 150),
+    BackgroundColor3 = PANEL,
+    BackgroundTransparency = 0.3,
+    Size = UDim2.new(1, 0, 0, 32),
+    ClearTextOnFocus = false,
+    LayoutOrder = -1
+}, side)
+corner(search, 6)
+
+local title = new("TextLabel", {
+    Text = "",
+    Font = Enum.Font.GothamBold,
+    TextSize = 16,
+    TextColor3 = TEXT,
+    BackgroundTransparency = 1,
+    Position = UDim2.fromOffset(172, 48),
+    Size = UDim2.fromOffset(290, 28),
+    TextXAlignment = Enum.TextXAlignment.Left,
+    ZIndex = 10
+}, window)
+
+new("Frame", {
+    Position = UDim2.fromOffset(166, 52),
+    Size = UDim2.fromOffset(3, 20),
+    BackgroundColor3 = ACCENT,
+    BorderSizePixel = 0
+}, window)
+
+local popup = new("ScrollingFrame", {
+    Size = UDim2.fromOffset(150, 40),
+    Position = UDim2.fromOffset(322, 84),
+    BackgroundColor3 = Color3.fromRGB(16, 12, 26),
+    BorderSizePixel = 0,
+    Visible = false,
+    ZIndex = 20,
+    ScrollBarThickness = 3,
+    ScrollBarImageColor3 = ACCENT,
+    CanvasSize = UDim2.new(),
+    AutomaticCanvasSize = Enum.AutomaticSize.Y
+}, window)
+corner(popup, 8)
+new("UIStroke", {Color = ACCENT, Thickness = 1}, popup)
+new("UIListLayout", {Padding = UDim.new(0, 2)}, popup)
+new("UIPadding", {
+    PaddingTop = UDim.new(0, 6),
+    PaddingBottom = UDim.new(0, 6),
+    PaddingLeft = UDim.new(0, 6),
+    PaddingRight = UDim.new(0, 6)
+}, popup)
+
+local popupOwner
+
+local function closePopup()
+    popup.Visible = false
+    popupOwner = nil
+end
+
+local function openDropdown(owner, options, current, onPick)
+    if popup.Visible and popupOwner == owner then
+        closePopup()
+        return
+    end
+
+    for _, child in ipairs(popup:GetChildren()) do
+        if child:IsA("TextButton") then
+            child:Destroy()
+        end
+    end
+
+    for _, option in ipairs(options) do
+        local button = new("TextButton", {
+            Text = "  " .. tostring(option),
+            Font = Enum.Font.GothamBold,
+            TextSize = 13,
+            TextColor3 = option == current and TEXT or GRAY,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            BackgroundColor3 = ACCENT,
+            BackgroundTransparency = option == current and 0.6 or 1,
+            Size = UDim2.new(1, -4, 0, 30),
+            ZIndex = 21
+        }, popup)
+
+        corner(button, 6)
+
+        button.Activated:Connect(function()
+            onPick(option)
+            closePopup()
+        end)
+    end
+
+    local height = math.min(#options * 32 + 12, 190)
+    local rel = owner.AbsolutePosition - window.AbsolutePosition
+    local x = math.clamp(
+        rel.X + owner.AbsoluteSize.X - 150,
+        8,
+        math.max(8, window.AbsoluteSize.X - 158)
+    )
+    local y = rel.Y + owner.AbsoluteSize.Y + 2
+
+    if y + height > window.AbsoluteSize.Y - 4 then
+        y = rel.Y - height - 2
+    end
+
+    popup.Position = UDim2.fromOffset(x, math.max(y, 44))
+    popup.Size = UDim2.fromOffset(150, height)
+    popup.CanvasPosition = Vector2.zero
+    popupOwner = owner
+    popup.Visible = true
+end
+
+local pages = {}
+local tabButtons = {}
+local allRows = {}
+
+local function showTab(name)
+    closePopup()
+
+    for tabName, page in pairs(pages) do
+        page.Visible = tabName == name
+    end
+
+    for tabName, button in pairs(tabButtons) do
+        button.TextColor3 = tabName == name and TEXT or GRAY
+    end
+
+    title.Text = name
+end
+
+local function commit(label, value)
+    Values[label] = value
+
+    local hook = Hooks[label]
+    if hook then
+        task.spawn(function()
+            local ok, err = pcall(hook, value)
+            if not ok then
+                warn("[Aletta] " .. tostring(label) .. ": " .. tostring(err))
+            end
+        end)
+    end
+end
+
+local function makeControl(parent, control, order)
+    local frame = new("Frame", {
+        Size = UDim2.new(1, 0, 0, 38),
+        BackgroundTransparency = 1,
+        LayoutOrder = order
+    }, parent)
+
+    Controls[control.label] = Controls[control.label] or {}
+
+    if control.type ~= "button"
+        and control.type ~= "label"
+        and control.type ~= "slider" then
+
+        new("TextLabel", {
+            Text = "   " .. control.label,
+            Font = Enum.Font.GothamBold,
+            TextSize = 12,
+            TextColor3 = Color3.fromRGB(220, 220, 220),
+            BackgroundTransparency = 1,
+            Size = UDim2.new(1, -118, 1, 0),
+            TextXAlignment = Enum.TextXAlignment.Left,
+            TextWrapped = true
+        }, frame)
+    end
+
+    if control.type == "toggle" then
+        local state = control.default == true
+        Values[control.label] = state
+
+        local switch = new("TextButton", {
+            Text = "",
+            Size = UDim2.fromOffset(40, 20),
+            Position = UDim2.new(1, -52, 0.5, -10),
+            AutoButtonColor = false,
+            BackgroundColor3 = state and ACCENT or OFF
+        }, frame)
+        corner(switch, 10)
+
+        local knob = new("Frame", {
+            Size = UDim2.fromOffset(16, 16),
+            Position = state and UDim2.fromOffset(22, 2) or UDim2.fromOffset(2, 2),
+            BackgroundColor3 = TEXT
+        }, switch)
+        corner(knob, 8)
+
+        local function setState(value, runHook)
+            state = value == true
+
+            TweenService:Create(
+                switch,
+                TweenInfo.new(0.15),
+                {BackgroundColor3 = state and ACCENT or OFF}
+            ):Play()
+
+            TweenService:Create(
+                knob,
+                TweenInfo.new(0.15),
+                {Position = state and UDim2.fromOffset(22, 2) or UDim2.fromOffset(2, 2)}
+            ):Play()
+
+            Values[control.label] = state
+
+            if runHook then
+                commit(control.label, state)
+            end
+        end
+
+        Controls[control.label].set = function(value)
+            setState(value, true)
+        end
+
+        switch.Activated:Connect(function()
+            setState(not state, true)
+        end)
+
+    elseif control.type == "input" then
+        Values[control.label] = tonumber(control.default) or control.default
+
+        local box = new("TextBox", {
+            Text = control.default,
+            PlaceholderText = control.placeholder or "",
+            PlaceholderColor3 = Color3.fromRGB(140, 140, 140),
+            Font = Enum.Font.GothamBold,
+            TextSize = 12,
+            TextColor3 = TEXT,
+            BackgroundColor3 = FIELD,
+            Size = UDim2.fromOffset(96, 26),
+            Position = UDim2.new(1, -106, 0.5, -13),
+            ClearTextOnFocus = false,
+            TextTruncate = Enum.TextTruncate.AtEnd
+        }, frame)
+        corner(box, 6)
+
+        Controls[control.label].set = function(value)
+            box.Text = tostring(value)
+            commit(control.label, tonumber(value) or value)
+        end
+
+        box.FocusLost:Connect(function()
+            commit(control.label, tonumber(box.Text) or box.Text)
+        end)
+
+    elseif control.type == "hotkey" then
+        local keyName = tostring(control.default or "Unknown")
+        local key = Enum.KeyCode[keyName] or Enum.KeyCode.Unknown
+        Values[control.label] = key
+
+        local button = new("TextButton", {
+            Text = key.Name,
+            Font = Enum.Font.GothamBold,
+            TextSize = 12,
+            TextColor3 = TEXT,
+            BackgroundColor3 = FIELD,
+            Size = UDim2.fromOffset(96, 26),
+            Position = UDim2.new(1, -106, 0.5, -13)
+        }, frame)
+        corner(button, 6)
+
+        local listening = false
+
+        button.Activated:Connect(function()
+            if listening then return end
+
+            listening = true
+            button.Text = "..."
+
+            local connection
+            connection = UIS.InputBegan:Connect(function(input, gameProcessed)
+                if gameProcessed then return end
+
+                if input.UserInputType == Enum.UserInputType.Keyboard then
+                    button.Text = input.KeyCode.Name
+                    commit(control.label, input.KeyCode)
+                    listening = false
+
+                    if connection then
+                        connection:Disconnect()
+                        connection = nil
+                    end
+                end
+            end)
+        end)
+
+        Controls[control.label].set = function(value)
+            local newKey
+
+            if typeof(value) == "EnumItem" then
+                newKey = value
+            else
+                newKey = Enum.KeyCode[tostring(value)] or Enum.KeyCode.Unknown
+            end
+
+            button.Text = newKey.Name
+            commit(control.label, newKey)
+        end
+
+    elseif control.type == "dropdown" then
+        Values[control.label] = control.default
+
+        local button = new("TextButton", {
+            Text = tostring(control.default),
+            Font = Enum.Font.GothamBold,
+            TextSize = 12,
+            TextColor3 = TEXT,
+            BackgroundColor3 = FIELD,
+            Size = UDim2.fromOffset(96, 26),
+            Position = UDim2.new(1, -106, 0.5, -13),
+            TextTruncate = Enum.TextTruncate.AtEnd
+        }, frame)
+        corner(button, 6)
+
+        button.Activated:Connect(function()
+            openDropdown(
+                button,
+                control.options,
+                Values[control.label],
+                function(value)
+                    button.Text = tostring(value)
+                    commit(control.label, value)
+                end
+            )
+        end)
+
+        Controls[control.label].set = function(value)
+            button.Text = tostring(value)
+            commit(control.label, value)
+        end
+
+        Controls[control.label].setOptions = function(options, current)
+            control.options = options or control.options
+            if current ~= nil then
+                button.Text = tostring(current)
+                Values[control.label] = current
+            end
+        end
+
+    elseif control.type == "slider" then
+        frame.Size = UDim2.new(1, 0, 0, 48)
+        Values[control.label] = control.default
+
+        new("TextLabel", {
+            Text = "   " .. control.label,
+            Font = Enum.Font.GothamBold,
+            TextSize = 12,
+            TextColor3 = Color3.fromRGB(220, 220, 220),
+            BackgroundTransparency = 1,
+            Size = UDim2.new(1, -80, 0, 24),
+            TextXAlignment = Enum.TextXAlignment.Left,
+            TextTruncate = Enum.TextTruncate.AtEnd
+        }, frame)
+
+        local valueLabel = new("TextLabel", {
+            Text = tostring(control.default) .. "/" .. tostring(control.max),
+            Font = Enum.Font.GothamBold,
+            TextSize = 12,
+            TextColor3 = GRAY,
+            BackgroundTransparency = 1,
+            Size = UDim2.fromOffset(70, 24),
+            Position = UDim2.new(1, -78, 0, 0),
+            TextXAlignment = Enum.TextXAlignment.Right
+        }, frame)
+
+        local track = new("TextButton", {
+            Text = "",
+            AutoButtonColor = false,
+            BackgroundColor3 = FIELD,
+            Size = UDim2.new(1, -24, 0, 8),
+            Position = UDim2.new(0, 12, 0, 32)
+        }, frame)
+        corner(track, 4)
+
+        local fill = new("Frame", {
+            BackgroundColor3 = ACCENT,
+            BorderSizePixel = 0,
+            Size = UDim2.fromScale(
+                (control.default - control.min) / math.max(1, control.max - control.min),
+                1
+            )
+        }, track)
+        corner(fill, 4)
+
+        local function setValue(value, runHook)
+            local number = tonumber(value) or control.default
+            number = math.clamp(
+                math.floor(number + 0.5),
+                control.min,
+                control.max
+            )
+
+            Values[control.label] = number
+
+            local alpha = (number - control.min) / math.max(1, control.max - control.min)
+            fill.Size = UDim2.fromScale(alpha, 1)
+            valueLabel.Text = tostring(number) .. "/" .. tostring(control.max)
+
+            if runHook then
+                commit(control.label, number)
+            end
+        end
+
+        Controls[control.label].set = function(value)
+            setValue(value, true)
+        end
+
+        local dragging = false
+
+        local function setFromX(x)
+            local width = math.max(1, track.AbsoluteSize.X)
+            local alpha = math.clamp(
+                (x - track.AbsolutePosition.X) / width,
+                0,
+                1
+            )
+
+            setValue(
+                control.min + alpha * (control.max - control.min),
+                true
+            )
+        end
+
+        track.InputBegan:Connect(function(input)
+            if isPress(input) then
+                dragging = true
+                setFromX(input.Position.X)
+            end
+        end)
+
+        UIS.InputChanged:Connect(function(input)
+            if dragging and isMove(input) then
+                setFromX(input.Position.X)
+            end
+        end)
+
+        UIS.InputEnded:Connect(function(input)
+            if isPress(input) then
+                dragging = false
+            end
+        end)
+
+    elseif control.type == "profile" then
+        frame.Size = UDim2.new(1, 0, 0, 92)
+
+        local avatar = new("ImageLabel", {
+            Name = "UserAvatar",
+            BackgroundColor3 = FIELD,
+            BackgroundTransparency = 0,
+            Size = UDim2.fromOffset(72, 72),
+            Position = UDim2.fromOffset(8, 8),
+            Image = "",
+            ScaleType = Enum.ScaleType.Crop
+        }, frame)
+        corner(avatar, 36)
+
+        local nameLabel = new("TextLabel", {
+            Text = player.DisplayName,
+            Font = Enum.Font.GothamBold,
+            TextSize = 15,
+            TextColor3 = TEXT,
+            BackgroundTransparency = 1,
+            Position = UDim2.fromOffset(92, 12),
+            Size = UDim2.new(1, -100, 0, 24),
+            TextXAlignment = Enum.TextXAlignment.Left,
+            TextTruncate = Enum.TextTruncate.AtEnd
+        }, frame)
+
+        local usernameLabel = new("TextLabel", {
+            Text = "@" .. player.Name,
+            Font = Enum.Font.Gotham,
+            TextSize = 12,
+            TextColor3 = GRAY,
+            BackgroundTransparency = 1,
+            Position = UDim2.fromOffset(92, 38),
+            Size = UDim2.new(1, -100, 0, 20),
+            TextXAlignment = Enum.TextXAlignment.Left,
+            TextTruncate = Enum.TextTruncate.AtEnd
+        }, frame)
+
+        local statusLabel = new("TextLabel", {
+            Text = "FREE  •  Beta V1",
+            Font = Enum.Font.GothamBold,
+            TextSize = 11,
+            TextColor3 = ACCENT,
+            BackgroundTransparency = 1,
+            Position = UDim2.fromOffset(92, 60),
+            Size = UDim2.new(1, -100, 0, 18),
+            TextXAlignment = Enum.TextXAlignment.Left
+        }, frame)
+
+        task.spawn(function()
+            local ok, content = pcall(function()
+                return Players:GetUserThumbnailAsync(player.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size100x100)
+            end)
+            if ok and content then
+                avatar.Image = content
+            end
+        end)
+
+    elseif control.type == "button" then
+        frame.Size = UDim2.new(1, 0, 0, 38)
+
+        local button = new("TextButton", {
+            Text = control.label,
+            Font = Enum.Font.GothamBold,
+            TextSize = 13,
+            TextColor3 = TEXT,
+            BackgroundColor3 = FIELD,
+            Size = UDim2.new(1, -16, 0, 32),
+            Position = UDim2.fromOffset(8, 3)
+        }, frame)
+        corner(button, 6)
+
+        button.Activated:Connect(function()
+            local hook = Hooks[control.label]
+            if hook then
+                task.spawn(function()
+                    local ok, err = pcall(hook)
+                    if not ok then
+                        warn("[Aletta] " .. control.label .. ": " .. tostring(err))
+                    end
+                end)
+            end
+        end)
+
+    elseif control.type == "label" then
+        frame.Size = UDim2.new(1, 0, 0, control.height or 30)
+
+        local note = new("TextLabel", {
+            Text = control.label,
+            Font = Enum.Font.Gotham,
+            TextSize = 11,
+            TextColor3 = GRAY,
+            BackgroundTransparency = 1,
+            Size = UDim2.fromScale(1, 1),
+            TextXAlignment = Enum.TextXAlignment.Left,
+            TextYAlignment = Enum.TextYAlignment.Top,
+            TextWrapped = true
+        }, frame)
+
+        new("UIPadding", {
+            PaddingLeft = UDim.new(0, 12),
+            PaddingRight = UDim.new(0, 12),
+            PaddingTop = UDim.new(0, 6)
+        }, note)
+    end
+end
+
+local function makeRow(page, feature)
+    local row = new("Frame", {
+        Size = UDim2.new(1, -6, 0, 40),
+        AutomaticSize = Enum.AutomaticSize.Y,
+        BackgroundColor3 = PANEL,
+        BackgroundTransparency = 0.3,
+        BorderSizePixel = 0
+    }, page)
+    corner(row, 6)
+
+    new("UIListLayout", {
+        SortOrder = Enum.SortOrder.LayoutOrder
+    }, row)
+
+    -- Tidak ada emoji LOCK di sini.
+    local head = new("TextButton", {
+        Text = "   " .. feature.name,
+        Font = Enum.Font.GothamBold,
+        TextSize = 14,
+        TextColor3 = TEXT,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        BackgroundTransparency = 1,
+        Size = UDim2.new(1, 0, 0, 40),
+        LayoutOrder = 1,
+        TextTruncate = Enum.TextTruncate.AtEnd
+    }, row)
+
+    new("TextLabel", {
+        Text = "v",
+        TextColor3 = GRAY,
+        Font = Enum.Font.GothamBold,
+        TextSize = 14,
+        BackgroundTransparency = 1,
+        Size = UDim2.fromOffset(32, 40),
+        Position = UDim2.new(1, -36, 0, 0)
+    }, head)
+
+    local body = new("Frame", {
+        Size = UDim2.new(1, 0, 0, 0),
+        AutomaticSize = Enum.AutomaticSize.Y,
+        BackgroundTransparency = 1,
+        Visible = false,
+        LayoutOrder = 2
+    }, row)
+
+    new("UIListLayout", {
+        SortOrder = Enum.SortOrder.LayoutOrder
+    }, body)
+
+    new("UIPadding", {
+        PaddingBottom = UDim.new(0, 6)
+    }, body)
+
+    for i, control in ipairs(feature.controls) do
+        makeControl(body, control, i)
+    end
+
+    head.Activated:Connect(function()
+        closePopup()
+        body.Visible = not body.Visible
+    end)
+
+    table.insert(allRows, {
+        frame = row,
+        name = feature.name:lower(),
+        page = page
+    })
+end
+
+for index, tab in ipairs(CONFIG) do
+    local button = new("TextButton", {
+        Text = "  " .. tab.name,
+        Font = Enum.Font.GothamBold,
+        TextSize = 14,
+        TextColor3 = TEXT,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        BackgroundTransparency = 1,
+        Size = UDim2.new(1, 0, 0, 36),
+        LayoutOrder = index,
+        TextTruncate = Enum.TextTruncate.AtEnd
+    }, side)
+
+    tabButtons[tab.name] = button
+
+    local page = new("ScrollingFrame", {
+        Position = UDim2.fromOffset(166, 82),
+        Size = UDim2.fromOffset(306, 240),
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        ScrollBarThickness = 3,
+        ScrollBarImageColor3 = ACCENT,
+        Visible = false,
+        CanvasSize = UDim2.new(),
+        AutomaticCanvasSize = Enum.AutomaticSize.Y
+    }, window)
+
+    new("UIListLayout", {
+        Padding = UDim.new(0, 6)
+    }, page)
+
+    pages[tab.name] = page
+
+    for _, feature in ipairs(tab.features) do
+        makeRow(page, feature)
+    end
+
+    button.Activated:Connect(function()
+        showTab(tab.name)
+    end)
+end
+
+showTab(CONFIG[1].name)
+
+for key, value in pairs(Values) do
+    Defaults[key] = value
+end
+
+search:GetPropertyChangedSignal("Text"):Connect(function()
+    local query = search.Text:lower()
+
+    for _, row in ipairs(allRows) do
+        row.frame.Visible = query == "" or row.name:find(query, 1, true) ~= nil
+    end
+end)
+
+-- =========================================================
+-- FISH IT UI HOOKS / CLIENT-SAFE UTILITIES
+-- =========================================================
+local savedCFrame = nil
+local function getCharacterRoot()
+    local character = player.Character
+    return character and (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart)
+end
+
+local function getPlayersOptions()
+    local list = {}
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= player then
+            table.insert(list, plr.Name)
+        end
+    end
+    table.sort(list)
+    if #list == 0 then list = {"No other player"} end
+    return list
+end
+
+local function scanNPCs()
+    local list = {}
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("Model") and obj ~= player.Character and obj:FindFirstChildOfClass("Humanoid") then
+            local root = obj:FindFirstChild("HumanoidRootPart") or obj.PrimaryPart
+            if root then table.insert(list, obj.Name) end
+        end
+    end
+    table.sort(list)
+    local unique, seen = {}, {}
+    for _, n in ipairs(list) do if not seen[n] then seen[n]=true; table.insert(unique,n) end end
+    return #unique > 0 and unique or {"No NPC found"}
+end
+
+local islandNames = {"Fisherman Island","Ocean","Tropical Grove","Kohana Island","Kohana Volcano","Coral Reefs","Crater Island","Esoteric Depths","Lost Isle","Sisyphus Statue","Treasure Room","Ancient Jungle","Sacred Temple","Pirate Cove","Crystal Depths","Pirate Treasure Room","Arcadia"}
+
+Hooks["Save Current Location"] = function()
+    local root = getCharacterRoot()
+    if root then savedCFrame = root.CFrame end
+end
+Hooks["Teleport to Saved"] = function()
+    local root = getCharacterRoot()
+    if root and savedCFrame then root.CFrame = savedCFrame end
+end
+Hooks["Reset Saved Location"] = function() savedCFrame = nil end
+Hooks["Show Real Ping Panel"] = function() print("[Aletta Fish It] Ping:", math.floor(player:GetNetworkPing()*1000), "ms") end
+Hooks["Auto Equip Rod"] = function() print("[Aletta Fish It] Auto Equip Rod enabled; actual inventory equip depends on Fish It API.") end
+Hooks["Bypass Radar"] = function() print("[Aletta Fish It] Bypass Radar is UI-only; no anti-cheat bypass is performed.") end
+Hooks["Buy Now"] = function() print("[Aletta Fish It] Shop action requires the game's official purchase API.") end
+Hooks["Test Webhook"] = function() print("[Aletta Fish It] Webhook test requested.") end
+Hooks["Refresh Player List"] = function()
+    local control = Controls["Select Player"]
+    if control and control.setOptions then control.setOptions(getPlayersOptions(), getPlayersOptions()[1]) end
+end
+Hooks["Refresh Trade List"] = Hooks["Refresh Player List"]
+Hooks["Refresh NPC List"] = function()
+    local options = scanNPCs()
+    local control = Controls["Select NPC"]
+    if control and control.setOptions then control.setOptions(options, options[1]) end
+end
+Hooks["Refresh Island List"] = function()
+    local control = Controls["Select Island"]
+    if control and control.setOptions then control.setOptions(islandNames, Values["Select Island"] or islandNames[1]) end
+end
+Hooks["Refresh Event List"] = function()
+    local options = {"No event detected", "Event / Limited"}
+    local control = Controls["Select Event"]
+    if control and control.setOptions then control.setOptions(options, options[1]) end
+end
+Hooks["Refresh Shop"] = function() print("[Aletta Fish It] Shop list refresh requested.") end
+Hooks["Teleport to Selected Player"] = function()
+    local target = Players:FindFirstChild(Values["Select Player"] or "")
+    local root, targetRoot = getCharacterRoot(), target and target.Character and (target.Character:FindFirstChild("HumanoidRootPart") or target.Character.PrimaryPart)
+    if root and targetRoot then root.CFrame = targetRoot.CFrame + Vector3.new(0,3,0) end
+end
+Hooks["Teleport to Island"] = function() print("[Aletta Fish It] Island teleport selected:", Values["Select Island"]) end
+Hooks["Teleport to NPC"] = function() print("[Aletta Fish It] NPC teleport selected:", Values["Select NPC"]) end
+
+player.CharacterAdded:Connect(function()
+    task.wait(0.25)
+    if Values["Auto Teleport on Spawn"] and savedCFrame then
+        local root = getCharacterRoot()
+        if root then root.CFrame = savedCFrame end
+    end
+end)
+
+-- =========================================================
+-- OPEN/CLOSE BUTTON DENGAN ASSET 111827431469508
+-- =========================================================
+
+local icon = new("ImageButton", {
+    Name = "AlettaFloatingLogo",
+    Image = LOGO_ID,
+    ScaleType = Enum.ScaleType.Fit,
+    BackgroundColor3 = Color3.fromRGB(18, 8, 32),
+    BackgroundTransparency = 0,
+    Size = UDim2.fromOffset(44, 44),
+    Position = UDim2.fromOffset(18, 120),
+    Visible = true,
+    Active = true,
+    AutoButtonColor = false,
+    ZIndex = 100
+}, gui)
+corner(icon, 22)
+
+local iconStroke = new("UIStroke", {
+    Color = ACCENT,
+    Thickness = 2.5
+}, icon)
+
+new("UIGradient", {
+    Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(110, 50, 255)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(230, 110, 255)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(90, 40, 200))
+    }),
+    Rotation = 45
+}, iconStroke)
+
+local function draggable(handle, target, onTap)
+    local dragging = false
+    local moved = false
+    local startMouse
+    local startPosition
+
+    handle.InputBegan:Connect(function(input)
+        if Values["Lock GUI"] then return end
+        if not isPress(input) then return end
+
+        dragging = true
+        moved = false
+        startMouse = input.Position
+        startPosition = target.Position
+
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+
+                if not moved and onTap then
+                    onTap()
+                end
+            end
+        end)
+    end)
+
+    UIS.InputChanged:Connect(function(input)
+        if not dragging or not isMove(input) then return end
+
+        local delta = input.Position - startMouse
+
+        if delta.Magnitude > 6 then
+            moved = true
+        end
+
+        if moved then
+            target.Position = UDim2.fromOffset(
+                startPosition.X.Offset + delta.X,
+                startPosition.Y.Offset + delta.Y
+            )
+        end
+    end)
+end
+
+local function minimize()
+    closePopup()
+    window.Visible = false
+    icon.Visible = true
+end
+
+local function restore()
+    window.Visible = true
+    icon.Visible = true
+end
+
+minBtn.Activated:Connect(minimize)
+icon.Activated:Connect(function()
+    if window.Visible then
+        minimize()
+    else
+        restore()
+    end
+end)
+
+-- Panel dan logo mempunyai posisi/drag masing-masing.
+draggable(top, window)
+draggable(icon, icon)
+
+-- =========================================================
+-- LOAD NOTIFICATION
+-- =========================================================
+
+local function showLoadNotification()
+    local notification = new("Frame", {
+        Name = "AlettaLoadNotification",
+        AnchorPoint = Vector2.new(0.5, 0),
+        Position = UDim2.new(0.5, 0, 0, 78),
+        Size = UDim2.fromOffset(420, 112),
+        BackgroundColor3 = Color3.fromRGB(10, 10, 12),
+        BackgroundTransparency = 0.14,
+        BorderSizePixel = 0,
+        ZIndex = 300,
+    }, gui)
+    corner(notification, 8)
+
+    new("UIStroke", {
+        Color = ACCENT,
+        Thickness = 1.5,
+        Transparency = 0.35,
+    }, notification)
+
+    new("TextLabel", {
+        Text = "Sukses",
+        Font = Enum.Font.GothamBold,
+        TextSize = 24,
+        TextColor3 = TEXT,
+        BackgroundTransparency = 1,
+        Position = UDim2.fromOffset(12, 10),
+        Size = UDim2.new(1, -24, 0, 30),
+        TextXAlignment = Enum.TextXAlignment.Center,
+        ZIndex = 301,
+    }, notification)
+
+    new("TextLabel", {
+        Text = "Berhasil memuat script untuk: [CURE]",
+        Font = Enum.Font.Gotham,
+        TextSize = 16,
+        TextColor3 = TEXT,
+        BackgroundTransparency = 1,
+        Position = UDim2.fromOffset(12, 43),
+        Size = UDim2.new(1, -24, 0, 26),
+        TextXAlignment = Enum.TextXAlignment.Center,
+        ZIndex = 301,
+    }, notification)
+
+    new("TextLabel", {
+        Text = "Distrik Kekerasan",
+        Font = Enum.Font.Gotham,
+        TextSize = 14,
+        TextColor3 = GRAY,
+        BackgroundTransparency = 1,
+        Position = UDim2.fromOffset(12, 70),
+        Size = UDim2.new(1, -24, 0, 24),
+        TextXAlignment = Enum.TextXAlignment.Center,
+        ZIndex = 301,
+    }, notification)
+
+    local loadSound = Instance.new("Sound")
+    loadSound.Name = "AlettaLoadSound"
+    loadSound.SoundId = LOAD_SOUND_ID
+    loadSound.Volume = 1
+    loadSound.Parent = notification
+    pcall(function() loadSound:Play() end)
+
+    task.delay(4, function()
+        if notification and notification.Parent then
+            local tween = TweenService:Create(notification, TweenInfo.new(0.25), {BackgroundTransparency = 1})
+            tween:Play()
+            task.delay(0.3, function()
+                if notification and notification.Parent then notification:Destroy() end
+            end)
+        end
+    end)
+end
+
+
+-- =========================================================
+-- FISH IT CLIENT-SAFE HOOKS
+-- =========================================================
+local savedCFrame = nil
+
+local function getRoot(plr)
+    plr = plr or player
+    local character = plr.Character
+    return character and (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart)
+end
+
+local function playerOptions()
+    local out = {}
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= player then table.insert(out, plr.Name) end
+    end
+    table.sort(out)
+    return #out > 0 and out or {"No other player"}
+end
+
+local function npcOptions()
+    local out, seen = {}, {}
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("Model") and obj ~= player.Character and obj:FindFirstChildOfClass("Humanoid") then
+            local root = obj:FindFirstChild("HumanoidRootPart") or obj.PrimaryPart
+            if root and not seen[obj.Name] then
+                seen[obj.Name] = true
+                table.insert(out, obj.Name)
+            end
+        end
+    end
+    table.sort(out)
+    return #out > 0 and out or {"No NPC found"}
+end
+
+local islandNames = {
+    "Fisherman Island", "Ocean", "Tropical Grove", "Kohana Island", "Kohana Volcano",
+    "Coral Reefs", "Crater Island", "Esoteric Depths", "Lost Isle", "Sisyphus Statue",
+    "Treasure Room", "Ancient Jungle", "Sacred Temple", "Pirate Cove", "Crystal Depths",
+    "Pirate Treasure Room", "Arcadia"
+}
+
+Hooks["Save Current Location"] = function()
+    local root = getRoot()
+    if root then savedCFrame = root.CFrame end
+end
+Hooks["Teleport to Saved"] = function()
+    local root = getRoot()
+    if root and savedCFrame then root.CFrame = savedCFrame end
+end
+Hooks["Reset Saved Location"] = function() savedCFrame = nil end
+Hooks["Show Real Ping Panel"] = function()
+    print("[Aletta Fish It] Ping:", math.floor(player:GetNetworkPing() * 1000), "ms")
+end
+Hooks["Teleport to Selected Player"] = function()
+    local target = Players:FindFirstChild(tostring(Values["Select Player"] or ""))
+    local root, targetRoot = getRoot(), getRoot(target)
+    if root and targetRoot then root.CFrame = targetRoot.CFrame + Vector3.new(0, 3, 0) end
+end
+Hooks["Refresh Player List"] = function()
+    local options = playerOptions()
+    local control = Controls["Select Player"]
+    if control and control.setOptions then control.setOptions(options, options[1]) end
+    local trade = Controls["Trade Player"]
+    if trade and trade.setOptions then trade.setOptions(options, options[1]) end
+end
+Hooks["Refresh Trade List"] = Hooks["Refresh Player List"]
+Hooks["Refresh NPC List"] = function()
+    local options = npcOptions()
+    local control = Controls["Select NPC"]
+    if control and control.setOptions then control.setOptions(options, options[1]) end
+end
+Hooks["Refresh Island List"] = function()
+    local control = Controls["Select Island"]
+    if control and control.setOptions then control.setOptions(islandNames, Values["Select Island"] or islandNames[1]) end
+end
+Hooks["Refresh Event List"] = function()
+    local options = {"No event detected", "Event / Limited"}
+    local control = Controls["Select Event"]
+    if control and control.setOptions then control.setOptions(options, options[1]) end
+end
+Hooks["Refresh Shop"] = function() print("[Aletta Fish It] Shop refresh requested.") end
+Hooks["Buy Now"] = function() print("[Aletta Fish It] Buy action requires the game's supported purchase API.") end
+Hooks["Teleport to Island"] = function() print("[Aletta Fish It] Selected island:", Values["Select Island"]) end
+Hooks["Teleport to NPC"] = function() print("[Aletta Fish It] Selected NPC:", Values["Select NPC"]) end
+Hooks["Test Webhook"] = function() print("[Aletta Fish It] Webhook test requested.") end
+Hooks["Save Webhook"] = function() print("[Aletta Fish It] Webhook settings saved for this session.") end
+Hooks["Bypass Radar"] = function() print("[Aletta Fish It] Radar bypass is intentionally not implemented.") end
+
+player.CharacterAdded:Connect(function()
+    task.wait(0.25)
+    if Values["Auto Teleport on Spawn"] and savedCFrame then
+        local root = getRoot()
+        if root then root.CFrame = savedCFrame end
+    end
+end)
+
+-- Initial dynamic lists.
+task.defer(function()
+    if Controls["Select Player"] then Hooks["Refresh Player List"]() end
+    if Controls["Select NPC"] then Hooks["Refresh NPC List"]() end
+end)
+
+-- Ensure the GUI remains a standalone Fish It UI.
+print("[Aletta Creator] Fish It - Fremium Edition loaded.")
+print("[Aletta Creator] Assets: 122038427201250 / 114593611204629 / 79108447755192")

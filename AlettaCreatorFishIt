@@ -196,10 +196,10 @@ local CONFIG = {
                 T("Disable Cutscenes")
             }},
             {name = "Stable Result", controls = {
-                D("Stable Result", {"Off", "Good", "Perfection"}, "Good")
+                T("Stable Result Good/Perfection")
             }},
             {name = "Skip Rarity", controls = {
-                D("Target Rarity", {"None", "Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic", "SECRET"}, "None"),
+                D("Target Rarity", {"None","Common","Uncommon","Rare","Epic","Legendary","Mythic","SECRET"}, "None"),
                 T("Enable Skip Rarity")
             }},
             {name = "Legit Fishing", controls = {
@@ -208,13 +208,13 @@ local CONFIG = {
                 T("Auto Shake")
             }},
             {name = "Instant Fishing", controls = {
-                D("Instant Mode", {"Normal", "Perfect"}, "Normal"),
+                D("Instant Mode", {"Normal","Perfect"}, "Normal"),
                 I("Instant Delay", "0.04", "0.04"),
                 T("Enable Instant")
             }},
             {name = "Instant Fast Reel [BETA]", controls = {
-                D("Fast Reel Mode", {"Normal", "Perfect"}, "Normal"),
-                I("Fishing Complete Delay", "0.30", "0.30"),
+                D("Fast Reel Mode", {"Normal","Perfect"}, "Normal"),
+                I("Fishing Complete Delay", "0.3", "0.3"),
                 T("Enable Ultra Blatant"),
                 T("Instant Fast Reel")
             }},
@@ -224,25 +224,27 @@ local CONFIG = {
                 I("Complete Delay V2", "0.01", "0.01")
             }},
             {name = "Perfect Rod/Bait Crafting", controls = {
-                L("Perfect Zone: gunakan crafting pada timing terbaik untuk hasil yang lebih stabil.", 46),
+                L("Perfect Zone membantu mendapatkan hasil craft yang stabil.", 42),
                 T("Enable Auto Perfect Crafting")
             }}
         }
     },
+
     {
         name = "Favorite",
         features = {
             {name = "Auto Favorite", controls = {
                 T("Auto Favorite"),
-                I("Filter Name", "", "Masukkan nama..."),
-                D("Filter Variant", {"None", "8-Bit", "Abyssal", "Albino", "Arctic Frost", "Aurora", "Binary", "Bloodmoon"}, "None"),
-                D("Filter Rarity", {"None", "Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic", "SECRET"}, "None"),
-                L("Logic filter: AND — semua filter yang terisi harus cocok. Filter kosong diabaikan.", 42)
+                I("Filter Name", "", "Nama item"),
+                I("Filter Variant", "", "Variant"),
+                D("Filter Rarity", {"All","Common","Uncommon","Rare","Epic","Legendary","Mythic","SECRET"}, "All"),
+                L("Filter aktif menggunakan logika AND. Filter kosong diabaikan.", 38)
             }},
             {name = "Un-Favorite", controls = {
-                I("Unfav Name", "", "Masukkan nama..."),
-                D("Unfav Variant", {"None", "8-Bit", "Abyssal", "Albino", "Arctic Frost", "Aurora", "Binary", "Bloodmoon"}, "None"),
-                D("Unfav Rarity", {"None", "Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic", "SECRET"}, "None")
+                T("Enable Un-Favorite"),
+                I("Unfav Name", "", "Nama item"),
+                I("Unfav Variant", "", "Variant"),
+                D("Unfav Rarity", {"All","Common","Uncommon","Rare","Epic","Legendary","Mythic","SECRET"}, "All")
             }},
             {name = "Special Favorite", controls = {
                 T("Auto Favorite Ruby (Gemstone)"),
@@ -250,24 +252,33 @@ local CONFIG = {
                 T("Auto Favorite Equipment")
             }},
             {name = "Equipment", controls = {
-                I("Equip Name", "", "Masukkan nama..."),
-                D("Equip Variant", {"None", "8-Bit", "Abyssal", "Albino", "Arctic Frost", "Aurora", "Binary", "Bloodmoon"}, "None"),
-                D("Equip Rarity", {"None", "Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic", "SECRET"}, "None"),
-                L("Contoh: Gears, Enchant Stone, Transcend Stone, Trophies, Equipment.", 40)
+                I("Equip Name", "", "Nama equipment"),
+                I("Equip Variant", "", "Variant"),
+                D("Equip Rarity", {"All","Common","Uncommon","Rare","Epic","Legendary","Mythic","SECRET"}, "All"),
+                L("Untuk Gear, Enchant Stone, Trophy dan Equipment lain.", 42)
+            }},
+            {name = "Variant List", controls = {
+                D("Variant", {"8-Bit","Abyssal","Albino","Arctic Frost","Aurora","Binary","Bloodmoon","Crystalized","Frosted","Galactic","Golden","Molten","Rainbow","Shiny","Silver","Stealthy"}, "8-Bit")
             }}
         }
     },
+
     {
         name = "Teleport",
         features = {
             {name = "Teleport to Island", controls = {
-                D("Select Island", {"Fisherman Island", "Ocean", "Tropical Grove", "Kohana Island", "Kohana Volcano", "Coral Reefs", "Crater Island", "Esoteric Depths", "Lost Isle", "Sisyphus Statue", "Treasure Room", "Ancient Jungle", "Sacred Temple", "Pirate Cove", "Crystal Depths", "Pirate Treasure Room", "Arcadia"}, "Fisherman Island"),
+                D("Select Island", {
+                    "Fisherman Island","Ocean","Tropical Grove","Kohana Island","Kohana Volcano",
+                    "Coral Reefs","Crater Island","Esoteric Depths","Lost Isle","Sisyphus Statue",
+                    "Treasure Room","Ancient Jungle","Sacred Temple","Pirate Cove","Crystal Depths",
+                    "Pirate Treasure Room","Arcadia"
+                }, "Fisherman Island"),
                 B("Teleport to Island"),
                 B("Refresh Island List")
             }},
             {name = "Teleport to Player", controls = {
-                D("Select Player", {"Refresh Player List"}, "Refresh Player List"),
-                B("Teleport to Selected Player"),
+                D("Select Player", {"No Player"}, "No Player"),
+                B("Teleport to selected Player"),
                 B("Refresh Player List")
             }},
             {name = "Saved Location", controls = {
@@ -277,81 +288,341 @@ local CONFIG = {
                 T("Auto Teleport on Spawn")
             }},
             {name = "Event Teleport", controls = {
-                D("Select Event", {"Refresh Event List"}, "Refresh Event List"),
-                T("Priority Event"),
+                D("Select Event", {"Auto Detect Event"}, "Auto Detect Event"),
+                D("Priority Event", {"Auto","Treasure Hunt","Meteor Shower","Aurora Borealis","Bloodmoon","Admin Event"}, "Auto"),
                 B("Refresh Event List"),
                 T("Auto Event Teleport")
             }},
             {name = "Teleport to NPC", controls = {
-                D("Select NPC", {"Refresh NPC List"}, "Refresh NPC List"),
+                D("Select NPC", {"No NPC"}, "No NPC"),
                 B("Teleport to NPC"),
                 B("Refresh NPC List")
             }}
         }
     },
+
     {
         name = "Shop",
         features = {
-            {name = "Shop", controls = {
-                T("Auto Buy"),
-                D("Shop Item", {"All Items", "Rod", "Bait", "Equipment", "Gemstone", "Other"}, "All Items"),
-                I("Buy Amount", "1", "Jumlah"),
-                B("Buy Now"),
+            {name = "Battlepass & Present", controls = {
+                B("Buy Battlepass Shop"),
+                B("Sell Present")
+            }},
+            {name = "Remote Merchant", controls = {
+                B("Remote Merchant"),
+                B("Buy Merchant Items")
+            }},
+            {name = "Rod & Bait", controls = {
+                D("Select Rod", {"Select Option"}, "Select Option"),
+                B("Buy Rod"),
+                D("Select Bait", {"Select Option"}, "Select Option"),
+                B("Buy Bait")
+            }},
+            {name = "Auto Sell", controls = {
+                T("Enable Auto Sell"),
+                D("Auto Sell Mode", {"Timer","Fish Count"}, "Timer"),
+                I("Value (Seconds/Fish Count)", "5", "5"),
+                B("Sell Now")
+            }},
+            {name = "Weather", controls = {
+                D("Select Weather", {"Clear","Rain","Storm","Aurora Borealis","Meteor Shower"}, "Clear"),
+                B("Buy Weather")
+            }},
+            {name = "Black Market", controls = {
+                D("Select Item", {
+                    "Dark Megalodon Hunt Potion",
+                    "Station Megalodon Hunt Potion",
+                    "Meteor Shower Potion",
+                    "Aurora Borealis Potion",
+                    "Glacial Serpent Hunt Potion",
+                    "Coin Toss Emote"
+                }, "Dark Megalodon Hunt Potion"),
+                B("Buy Black Market Item"),
+                T("Auto Buy Black Market")
+            }},
+            {name = "Shop Item", controls = {
+                D("Shop Category", {"All Items","Rod","Bait","Equipment","Gemstone","Other"}, "All Items"),
+                I("Amount", "1", "Jumlah"),
                 B("Refresh Shop")
             }}
         }
     },
+
     {
         name = "Automation",
         features = {
-            {name = "Fishing Automation", controls = {
-                T("Auto Fish"),
-                T("Auto Shake"),
-                T("Auto Reel"),
-                T("Auto Equip Best Rod"),
-                T("Auto Equip Best Bait"),
-                T("Auto Sell"),
-                T("Auto Repair Rod")
+            {name = "Treasure Hunt", controls = {
+                L("Otomatis mencari server dengan Treasure Hunt aktif.", 42),
+                T("Enable Auto Join Treasure Hunt"),
+                B("Teleport Now")
             }},
-            {name = "Automation Settings", controls = {
-                S("Automation Delay", 0, 20, 5),
-                D("Fish Mode", {"Legit", "Normal", "Fast", "Perfect"}, "Normal"),
-                T("Auto Reconnect"),
-                T("Anti AFK")
+            {name = "Mining Crystal", controls = {
+                L("Otomatis mining Veilshard di Lava Basin dan equip pickaxe saat mining.", 48),
+                T("Enable Auto Mine Veilshard"),
+                B("Start Mining Veilshard"),
+                B("Stop Mining Veilshard")
+            }},
+            {name = "Atlantis Machine", controls = {
+                T("Enable Atlantis Machine"),
+                B("Claim Pirate Chest"),
+                B("Craft Charm"),
+                B("Buy Charm"),
+                D("Charm Type", {"Algae Charm","Other Charm"}, "Algae Charm"),
+                I("Amount", "1", "Jumlah"),
+                T("Use Potion"),
+                D("Select Orb", {"Select Option","Basic Orb","Rare Orb","Other Orb"}, "Select Option"),
+                T("Use Orb")
+            }},
+            {name = "Enchant Features", controls = {
+                L("Enchant Status", 28),
+                {type = "label", label = "Current Rod : None", height = 24},
+                {type = "label", label = "Enchant 1 : None", height = 24},
+                {type = "label", label = "Enchant 2 : None", height = 24},
+                {type = "label", label = "Enchant Stones Left : 0", height = 24},
+                D("Enchant Type", {"Normal Enchant","Second Enchant","Evolved Enchant","Candy Enchant","Eggy Enchant","Runic Enchant"}, "Normal Enchant"),
+                D("Target Enchant", {"Experienced","Other"}, "Experienced"),
+                T("Auto Enchant Reroll")
+            }},
+            {name = "Auto Totem", controls = {
+                L("Slot 4 bersifat opsional untuk event totem. Jika efek habis, totem dapat di-respawn otomatis.", 50),
+                D("Totem Slot 1", {"Abyssal Totem","Select Option"}, "Abyssal Totem"),
+                D("Totem Slot 2", {"Arcadia Totem","Select Option"}, "Arcadia Totem"),
+                D("Totem Slot 3", {"Cosmic Totem","Select Option"}, "Cosmic Totem"),
+                D("Totem Slot 4", {"Event Totem","Select Option"}, "Event Totem"),
+                T("Enable Auto Spawn Totem"),
+                B("Spawn Totem"),
+                B("Spawn 4X Totem (Mix) [BETA]")
+            }},
+            {name = "Advanced Automation", controls = {
+                B("Create Transcended Stone"),
+                T("Auto Ancient Loch Ness Monster"),
+                T("Auto Mutant Runic Koi")
             }}
         }
     },
+
     {
         name = "Trade",
         features = {
             {name = "Trade", controls = {
-                T("Auto Accept Trade"),
-                T("Auto Send Trade"),
-                D("Trade Player", {"Refresh Player List"}, "Refresh Player List"),
-                I("Trade Item", "", "Masukkan item..."),
-                B("Refresh Trade List")
+                D("Select Player", {"No Player"}, "No Player"),
+                I("Trade By Name", "", "Nama Fish"),
+                I("Trade By Coin", "", "Jumlah Coin"),
+                D("Trade By Rarity", {"Common","Uncommon","Rare","Epic","Legendary","Mythic","SECRET"}, "Common"),
+                T("Trade Enchant Stone"),
+                T("Auto Accept Trade")
+            }},
+            {name = "Trade Status", controls = {
+                L("Status", 26),
+                {type = "label", label = "Idle", height = 26},
+                I("Select Item", "", "Nama item"),
+                I("Amount Fish", "1", "Jumlah"),
+                B("Start Trade By Name"),
+                B("Start Trade By Coin"),
+                B("Start Trade By Rarity")
             }},
             {name = "Trade Settings", controls = {
-                T("Confirm Before Trade"),
-                T("Block Unknown Trade")
+                D("Select Rarity", {"Common","Uncommon","Rare","Epic","Legendary","Mythic","SECRET"}, "Common"),
+                I("Amount", "1", "Jumlah")
             }}
         }
     },
+
     {
         name = "Webhook",
         features = {
-            {name = "Webhook", controls = {
-                T("Enable Webhook"),
-                I("Webhook URL", "", "Masukkan webhook URL..."),
-                D("Webhook Event", {"Fish Caught", "Rare Fish", "Legendary", "Mythic", "SECRET", "Event"}, "Fish Caught"),
-                T("Notify Rare Only"),
+            {name = "Fishing Catch Webhook", controls = {
+                T("Enable Fishing Catch Webhook"),
+                I("Webhook URL (Fish)", "", "Enter Value"),
+                I("Discord User ID (Fish)", "", "Enter Value"),
+                T("Hide Identity (Fish)"),
+                D("Select Tiers to Log", {"All","Rare","Epic","Legendary","Mythic","SECRET"}, "All")
+            }},
+            {name = "Disconnect Webhook", controls = {
+                T("Enable Disconnect Webhook"),
+                I("Webhook URL (Disconnect)", "", "Enter Value"),
+                I("Discord User ID (Disconnect)", "", "Enter Value"),
+                T("Hide Identity (Disconnect)")
+            }},
+            {name = "Webhook Server", controls = {
+                T("Track Player Join"),
+                T("Track Player Leave"),
+                T("Enable Webhook Server"),
+                B("Test Webhook Server")
+            }},
+            {name = "Event Spawn Webhook", controls = {
+                I("Webhook URL (Event)", "", "Enter Value"),
+                D("Select Events", {"Admin - Bermuda Triangle","Admin - Black Hole","Admin - Bloodmoon","Admin - Frostmoon","Admin - Ghost Worm","Admin - Purple Bloodmoon","Admin - Talon Kikir"}, "Admin - Bermuda Triangle"),
+                B("Refresh Event List"),
+                T("Enable Event Spawn Webhook"),
+                B("Test Event Webhook")
+            }},
+            {name = "Treasure Hunt Webhook", controls = {
+                I("Webhook URL (Treasure Reward)", "", "Enter Value"),
+                I("Discord User ID (Treasure Reward)", "", "Enter Value"),
+                T("Hide Identity (Treasure Reward)"),
+                T("Enable Treasure Hunt Reward Webhook")
+            }},
+            {name = "Webhook Settings", controls = {
                 B("Test Webhook"),
                 B("Save Webhook")
+            }}
+        }
+    },
+
+    {
+        name = "Skin Features",
+        features = {
+            {name = "Accessory Changer", controls = {
+                D("Pilih Accessory", {"Select Option"}, "Select Option"),
+                B("Refresh Accessory List"),
+                T("Enable Accessory"),
+                B("Remove Accessory")
             }},
-            {name = "Webhook Filter", controls = {
-                D("Webhook Rarity", {"All", "Rare", "Epic", "Legendary", "Mythic", "SECRET"}, "All"),
-                T("Include Player Name"),
-                T("Include Fish Variant")
+            {name = "Rod Model Skin", controls = {
+                D("Pilih Model Rod", {"Select Option"}, "Select Option"),
+                B("Refresh Model List"),
+                T("Enable Rod Model Skin")
+            }},
+            {name = "Avatar Changer", controls = {
+                D("Pilih Avatar", {"WILDES","TALON","Solace A.K.A Soleh","ZAER","EA_GAMES","Stealthy","RZXTL"}, "WILDES"),
+                B("Apply Avatar"),
+                T("Enable Avatar Changer")
+            }},
+            {name = "Aura Skin", controls = {
+                D("Pilih Aura", {"Fluorescent Rod","Forest Glow","Forsaken","Frosted Guitar","Frozen Krampus Scythe","Frozen Rod","Galactic"}, "Fluorescent Rod"),
+                B("Refresh Aura List"),
+                T("Enable Aura Skin")
+            }},
+            {name = "Rod Bait Visual Override", controls = {
+                D("Bait Dive VFX (by Rod Skin)", {"Default","Fluorescent Rod","Forest Glow","Forsaken","Frosted Guitar","Frozen Krampus Scythe","Frozen Rod","Galactic"}, "Default"),
+                B("Muat Daftar Rod"),
+                B("Scan VFX (lama, ~30 detik)"),
+                T("Override Bait Dive VFX")
+            }},
+            {name = "Skin Animation", controls = {
+                D("Skin Animation", {"Default","Idle","Cast","Reel","Custom"}, "Default"),
+                T("Enable Skin Animation")
+            }},
+            {name = "Emote", controls = {
+                D("Emote", {"Default","Dance","Wave","Laugh","Cheer","Other"}, "Default"),
+                B("Play Emote")
+            }}
+        }
+    },
+
+    {
+        name = "Quest",
+        features = {
+            {name = "Quest List", controls = {
+                D("Quest", {"Deep Sea Quest","Element Quest","Diamond Researcher Quest","Auto Ancient Ruin","Crystalline Secret Quest","Leviathan Hunt"}, "Deep Sea Quest")
+            }},
+            {name = "Deep Sea Quest", controls = {
+                T("Enable Deep Sea Quest"),
+                B("Auto Deep Sea Quest")
+            }},
+            {name = "Element Quest", controls = {
+                T("Enable Element Quest"),
+                B("Auto Element Quest")
+            }},
+            {name = "Diamond Researcher Quest", controls = {
+                T("Enable Diamond Researcher Quest"),
+                B("Auto Diamond Researcher Quest")
+            }},
+            {name = "Auto Ancient Ruin", controls = {
+                L("Ancient Ruin Status — aktifkan untuk memuat status.", 42),
+                T("Auto Ancient Ruin")
+            }},
+            {name = "Crystalline Secret Quest", controls = {
+                T("Enable Crystalline Secret Quest"),
+                B("Auto Crystalline Secret Quest")
+            }},
+            {name = "Leviathan Hunt", controls = {
+                T("Enable Leviathan Hunt"),
+                B("Auto Leviathan Hunt")
+            }}
+        }
+    },
+
+    {
+        name = "Settings",
+        features = {
+            {name = "Protection", controls = {
+                T("Anti Kick"),
+                T("Protection")
+            }},
+            {name = "Camera", controls = {
+                L("Freecam — gerakkan kamera bebas tanpa batas.", 38),
+                T("Freecam"),
+                I("Freecam Speed", "50", "50")
+            }},
+            {name = "Performance", controls = {
+                T("Unlock FPS"),
+                D("FPS Cap", {"60","120","144","240","Max"}, "240")
+            }},
+            {name = "Notification Position", controls = {
+                T("Enable Custom Notification Position"),
+                D("Select Position", {"Atas","Tengah","Bawah","Kiri","Kanan"}, "Tengah")
+            }},
+            {name = "Hide Stats", controls = {
+                T("Hide Stats")
+            }},
+            {name = "Server", controls = {
+                B("Rejoin Server"),
+                B("Serverhop")
+            }},
+            {name = "Auto Reconnect & Execute", controls = {
+                T("Auto Reconnect & Execute"),
+                I("Reconnect Delay", "5", "Seconds")
+            }},
+            {name = "Color Correction", controls = {
+                D("Color Preset", {"Normal","Night","Day","Bloodmoon","Purple Bloodmoon","Galaxy","Teal & Orange","Tropical","Vibrant","Vintage","Warm"}, "Normal"),
+                T("Enable Color Correction")
+            }},
+            {name = "Change Time", controls = {
+                D("Time Profile", {"Day","Night","Custom"}, "Day"),
+                S("Change Time", 0, 24, 12)
+            }}
+        }
+    },
+
+    {
+        name = "Config",
+        features = {
+            {name = "Auto Save", controls = {
+                T("Auto Save Config", true),
+                L("Setting disimpan sebagai snapshot lokal selama sesi.", 42)
+            }},
+            {name = "Config Management", controls = {
+                I("Config Name", "", "Masukan Nama"),
+                B("Create Config"),
+                D("Config List", {"No Config"}, "No Config"),
+                B("Load Config"),
+                B("Overwrite Config"),
+                B("Delete Config"),
+                B("Refresh List"),
+                B("Set as Autoload"),
+                B("Reset Autoload"),
+                B("Reset to Default")
+            }}
+        }
+    },
+
+    {
+        name = "Info",
+        features = {
+            {name = "Profil User", controls = {
+                {type = "profile", label = "User Profile"},
+                {type = "label", label = "Username  •  LocalPlayer", height = 26},
+                {type = "label", label = "Status  •  FREE", height = 26}
+            }},
+            {name = "Script Info", controls = {
+                {type = "label", label = "Developer  •  Aletta", height = 26},
+                {type = "label", label = "Game  •  Fish It", height = 26},
+                {type = "label", label = "Version  •  Beta Fish It", height = 32}
+            }},
+            {name = "GUI", controls = {
+                B("Destroy UI")
             }}
         }
     }
@@ -469,7 +740,7 @@ local headerLogo = new("ImageLabel", {
 }, top)
 
 new("TextLabel", {
-    Text = "Fish It - Fremium Edition",
+    Text = "Violence District - Fremium Edition",
     Font = Enum.Font.GothamBold,
     TextSize = 12,
     TextColor3 = TEXT,
@@ -1188,93 +1459,6 @@ search:GetPropertyChangedSignal("Text"):Connect(function()
 end)
 
 -- =========================================================
--- FISH IT UI HOOKS / CLIENT-SAFE UTILITIES
--- =========================================================
-local savedCFrame = nil
-local function getCharacterRoot()
-    local character = player.Character
-    return character and (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart)
-end
-
-local function getPlayersOptions()
-    local list = {}
-    for _, plr in ipairs(Players:GetPlayers()) do
-        if plr ~= player then
-            table.insert(list, plr.Name)
-        end
-    end
-    table.sort(list)
-    if #list == 0 then list = {"No other player"} end
-    return list
-end
-
-local function scanNPCs()
-    local list = {}
-    for _, obj in ipairs(workspace:GetDescendants()) do
-        if obj:IsA("Model") and obj ~= player.Character and obj:FindFirstChildOfClass("Humanoid") then
-            local root = obj:FindFirstChild("HumanoidRootPart") or obj.PrimaryPart
-            if root then table.insert(list, obj.Name) end
-        end
-    end
-    table.sort(list)
-    local unique, seen = {}, {}
-    for _, n in ipairs(list) do if not seen[n] then seen[n]=true; table.insert(unique,n) end end
-    return #unique > 0 and unique or {"No NPC found"}
-end
-
-local islandNames = {"Fisherman Island","Ocean","Tropical Grove","Kohana Island","Kohana Volcano","Coral Reefs","Crater Island","Esoteric Depths","Lost Isle","Sisyphus Statue","Treasure Room","Ancient Jungle","Sacred Temple","Pirate Cove","Crystal Depths","Pirate Treasure Room","Arcadia"}
-
-Hooks["Save Current Location"] = function()
-    local root = getCharacterRoot()
-    if root then savedCFrame = root.CFrame end
-end
-Hooks["Teleport to Saved"] = function()
-    local root = getCharacterRoot()
-    if root and savedCFrame then root.CFrame = savedCFrame end
-end
-Hooks["Reset Saved Location"] = function() savedCFrame = nil end
-Hooks["Show Real Ping Panel"] = function() print("[Aletta Fish It] Ping:", math.floor(player:GetNetworkPing()*1000), "ms") end
-Hooks["Auto Equip Rod"] = function() print("[Aletta Fish It] Auto Equip Rod enabled; actual inventory equip depends on Fish It API.") end
-Hooks["Bypass Radar"] = function() print("[Aletta Fish It] Bypass Radar is UI-only; no anti-cheat bypass is performed.") end
-Hooks["Buy Now"] = function() print("[Aletta Fish It] Shop action requires the game's official purchase API.") end
-Hooks["Test Webhook"] = function() print("[Aletta Fish It] Webhook test requested.") end
-Hooks["Refresh Player List"] = function()
-    local control = Controls["Select Player"]
-    if control and control.setOptions then control.setOptions(getPlayersOptions(), getPlayersOptions()[1]) end
-end
-Hooks["Refresh Trade List"] = Hooks["Refresh Player List"]
-Hooks["Refresh NPC List"] = function()
-    local options = scanNPCs()
-    local control = Controls["Select NPC"]
-    if control and control.setOptions then control.setOptions(options, options[1]) end
-end
-Hooks["Refresh Island List"] = function()
-    local control = Controls["Select Island"]
-    if control and control.setOptions then control.setOptions(islandNames, Values["Select Island"] or islandNames[1]) end
-end
-Hooks["Refresh Event List"] = function()
-    local options = {"No event detected", "Event / Limited"}
-    local control = Controls["Select Event"]
-    if control and control.setOptions then control.setOptions(options, options[1]) end
-end
-Hooks["Refresh Shop"] = function() print("[Aletta Fish It] Shop list refresh requested.") end
-Hooks["Teleport to Selected Player"] = function()
-    local target = Players:FindFirstChild(Values["Select Player"] or "")
-    local root, targetRoot = getCharacterRoot(), target and target.Character and (target.Character:FindFirstChild("HumanoidRootPart") or target.Character.PrimaryPart)
-    if root and targetRoot then root.CFrame = targetRoot.CFrame + Vector3.new(0,3,0) end
-end
-Hooks["Teleport to Island"] = function() print("[Aletta Fish It] Island teleport selected:", Values["Select Island"]) end
-Hooks["Teleport to NPC"] = function() print("[Aletta Fish It] NPC teleport selected:", Values["Select NPC"]) end
-
-player.CharacterAdded:Connect(function()
-    task.wait(0.25)
-    if Values["Auto Teleport on Spawn"] and savedCFrame then
-        local root = getCharacterRoot()
-        if root then root.CFrame = savedCFrame end
-    end
-end)
-
--- =========================================================
 -- OPEN/CLOSE BUTTON DENGAN ASSET 111827431469508
 -- =========================================================
 
@@ -1452,110 +1636,1576 @@ local function showLoadNotification()
     end)
 end
 
-
 -- =========================================================
--- FISH IT CLIENT-SAFE HOOKS
+-- LOCAL TEST FEATURES
 -- =========================================================
-local savedCFrame = nil
 
-local function getRoot(plr)
-    plr = plr or player
-    local character = plr.Character
-    return character and (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart)
+local originalWalkSpeed = 16
+local originalFOV = camera and camera.FieldOfView or 70
+
+local originalLighting = {
+    Brightness = Lighting.Brightness,
+    ClockTime = Lighting.ClockTime,
+    FogEnd = Lighting.FogEnd,
+    FogStart = Lighting.FogStart,
+    GlobalShadows = Lighting.GlobalShadows
+}
+
+local particleCache = {}
+local crosshairGui
+local fpsLabel
+local espFolder
+local espGui
+local mwGui
+local mwButton
+
+local function character()
+    return player.Character
 end
 
-local function playerOptions()
-    local out = {}
-    for _, plr in ipairs(Players:GetPlayers()) do
-        if plr ~= player then table.insert(out, plr.Name) end
+local function humanoid()
+    local c = character()
+    return c and c:FindFirstChildOfClass("Humanoid")
+end
+
+local function root()
+    local c = character()
+    return c and c:FindFirstChild("HumanoidRootPart")
+end
+
+-- =========================================================
+-- MOVEMENT / CAMERA / LIGHTING
+-- =========================================================
+
+Hooks["Enable Run Speed"] = function(on)
+    local h = humanoid()
+    if not h then return end
+
+    if on then
+        h.WalkSpeed = tonumber(Values["Speed Value"]) or 20
+    else
+        h.WalkSpeed = originalWalkSpeed
     end
-    table.sort(out)
-    return #out > 0 and out or {"No other player"}
 end
 
-local function npcOptions()
-    local out, seen = {}, {}
-    for _, obj in ipairs(workspace:GetDescendants()) do
-        if obj:IsA("Model") and obj ~= player.Character and obj:FindFirstChildOfClass("Humanoid") then
-            local root = obj:FindFirstChild("HumanoidRootPart") or obj.PrimaryPart
-            if root and not seen[obj.Name] then
-                seen[obj.Name] = true
-                table.insert(out, obj.Name)
+Hooks["Speed Value"] = function(value)
+    if not Values["Enable Run Speed"] then return end
+
+    local h = humanoid()
+    if h then
+        h.WalkSpeed = tonumber(value) or 20
+    end
+end
+
+Hooks["Unlimited Zoom"] = function(on)
+    player.CameraMaxZoomDistance = on and 1000 or 128
+end
+
+Hooks["Auto Sprint Mobile"] = function(on)
+    local h = humanoid()
+    if not h then return end
+
+    -- Developer/test behavior: keep sprint state local and restore the
+    -- original WalkSpeed when disabled. Server-side movement validation
+    -- remains authoritative.
+    if on then
+        if Values["SpeedBoost"] then
+            h.WalkSpeed = tonumber(Values["Speed Boost Value"]) or h.WalkSpeed
+        else
+            h.WalkSpeed = math.max(h.WalkSpeed, 20)
+        end
+    else
+        h.WalkSpeed = originalWalkSpeed
+    end
+end
+
+Hooks["Auto Skill Check Mode"] = function(mode)
+    Values["Auto Skill Check Mode"] = tostring(mode or "Legit")
+    -- Mode selection is stored for the game's legitimate skill-check
+    -- controller. No remote validation is bypassed here.
+end
+
+Hooks["Auto Skill Check"] = function(on)
+    Values["Auto Skill Check"] = on == true
+end
+
+Hooks["Custom FOV"] = function(on)
+    camera = workspace.CurrentCamera or camera
+    if not camera then return end
+
+    if on then
+        camera.FieldOfView = tonumber(Values["Field of View"]) or 70
+    else
+        camera.FieldOfView = originalFOV
+    end
+end
+
+Hooks["Field of View"] = function(value)
+    if not Values["Custom FOV"] then return end
+
+    camera = workspace.CurrentCamera or camera
+    if camera then
+        camera.FieldOfView = tonumber(value) or 70
+    end
+end
+
+Hooks["Full Bright"] = function(on)
+    if on then
+        Lighting.Brightness = 2
+        Lighting.ClockTime = 14
+    else
+        Lighting.Brightness = originalLighting.Brightness
+        Lighting.ClockTime = originalLighting.ClockTime
+    end
+end
+
+Hooks["No Fog"] = function(on)
+    if on then
+        Lighting.FogStart = 0
+        Lighting.FogEnd = 1000000
+    else
+        Lighting.FogStart = originalLighting.FogStart
+        Lighting.FogEnd = originalLighting.FogEnd
+    end
+end
+
+Hooks["Disable Shadows"] = function(on)
+    Lighting.GlobalShadows = not on
+end
+
+Hooks["No Clip"] = function(on)
+    if not on then return end
+
+    FeatureManager:Connect("No Clip", RunService.Stepped, function()
+        local c = character()
+        if not c then return end
+
+        for _, part in ipairs(c:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = false
+            end
+        end
+    end)
+end
+
+Hooks["Disable Particles"] = function(on)
+    if on then
+        particleCache = {}
+
+        for _, object in ipairs(workspace:GetDescendants()) do
+            if object:IsA("ParticleEmitter")
+                or object:IsA("Trail")
+                or object:IsA("Beam") then
+
+                particleCache[object] = object.Enabled
+                object.Enabled = false
+            end
+        end
+    else
+        for object, state in pairs(particleCache) do
+            if object and object.Parent then
+                object.Enabled = state
+            end
+        end
+
+        particleCache = {}
+    end
+end
+
+Hooks["Lower Graphics"] = function(on)
+    if not on then return end
+
+    pcall(function()
+        settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+    end)
+end
+
+Hooks["FPS Unlocker"] = function()
+    -- Roblox client mengontrol frame cap.
+end
+
+Hooks["FPS Cap Value"] = function()
+    -- Disimpan sebagai setting GUI.
+end
+
+-- =========================================================
+-- FPS COUNTER
+-- =========================================================
+
+local fpsFrames = 0
+local fpsTime = 0
+
+Hooks["FPS Counter"] = function(on)
+    if on then
+        if fpsLabel then
+            fpsLabel:Destroy()
+            fpsLabel = nil
+        end
+
+        fpsLabel = new("TextLabel", {
+            Name = "FPSCounter",
+            Text = "FPS: --",
+            Font = Enum.Font.GothamBold,
+            TextSize = 14,
+            TextColor3 = TEXT,
+            BackgroundColor3 = PANEL,
+            BackgroundTransparency = 0.2,
+            Size = UDim2.fromOffset(100, 28),
+            Position = UDim2.fromOffset(8, 8),
+            ZIndex = 100
+        }, gui)
+        corner(fpsLabel, 6)
+
+        fpsFrames = 0
+        fpsTime = 0
+
+        FeatureManager:Connect("FPS Counter", RunService.RenderStepped, function(dt)
+            if not fpsLabel then return end
+
+            fpsFrames += 1
+            fpsTime += dt
+
+            if fpsTime >= 0.5 then
+                fpsLabel.Text = "FPS: " .. math.floor(fpsFrames / fpsTime)
+                fpsFrames = 0
+                fpsTime = 0
+            end
+        end)
+    else
+        if fpsLabel then
+            fpsLabel:Destroy()
+            fpsLabel = nil
+        end
+    end
+end
+
+-- =========================================================
+-- CROSSHAIR
+-- =========================================================
+
+local function destroyCrosshair()
+    if crosshairGui then
+        crosshairGui:Destroy()
+        crosshairGui = nil
+    end
+end
+
+local function makeCrosshair()
+    destroyCrosshair()
+
+    crosshairGui = new("ScreenGui", {
+        Name = "AlettaCrosshair",
+        ResetOnSpawn = false,
+        IgnoreGuiInset = true,
+        ZIndexBehavior = Enum.ZIndexBehavior.Global
+    }, playerGui)
+
+    local frame = new("Frame", {
+        BackgroundTransparency = 1,
+        Size = UDim2.fromOffset(60, 60),
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = UDim2.new(
+            0.5,
+            tonumber(Values["Crosshair X Offset"]) or 0,
+            0.5,
+            tonumber(Values["Crosshair Y Offset"]) or 0
+        )
+    }, crosshairGui)
+
+    local typeName = Values["Crosshair Type"] or "Cross"
+    local size = tonumber(Values["Crosshair Size"]) or 4
+
+    local colorMap = {
+        Green = Color3.fromRGB(80, 255, 120),
+        Cyan = Color3.fromRGB(60, 220, 255),
+        Red = Color3.fromRGB(255, 70, 70),
+        Yellow = Color3.fromRGB(255, 220, 50),
+        Orange = Color3.fromRGB(255, 150, 50),
+        Blue = Color3.fromRGB(80, 130, 255),
+        Purple = ACCENT,
+        White = TEXT,
+        Pink = Color3.fromRGB(255, 100, 200)
+    }
+
+    local color = colorMap[Values["Crosshair Color"]] or colorMap.Green
+
+    if typeName == "Dot" then
+        local dot = new("Frame", {
+            Size = UDim2.fromOffset(size, size),
+            AnchorPoint = Vector2.new(0.5, 0.5),
+            Position = UDim2.fromScale(0.5, 0.5),
+            BackgroundColor3 = color,
+            BorderSizePixel = 0
+        }, frame)
+        corner(dot, size)
+
+    elseif typeName == "Cross" then
+        new("Frame", {
+            Size = UDim2.fromOffset(size * 4, size),
+            AnchorPoint = Vector2.new(0.5, 0.5),
+            Position = UDim2.fromScale(0.5, 0.5),
+            BackgroundColor3 = color,
+            BorderSizePixel = 0
+        }, frame)
+
+        new("Frame", {
+            Size = UDim2.fromOffset(size, size * 4),
+            AnchorPoint = Vector2.new(0.5, 0.5),
+            Position = UDim2.fromScale(0.5, 0.5),
+            BackgroundColor3 = color,
+            BorderSizePixel = 0
+        }, frame)
+
+    elseif typeName == "Circle" then
+        local circle = new("Frame", {
+            Size = UDim2.fromOffset(size * 8, size * 8),
+            AnchorPoint = Vector2.new(0.5, 0.5),
+            Position = UDim2.fromScale(0.5, 0.5),
+            BackgroundTransparency = 1
+        }, frame)
+        corner(circle, size * 4)
+
+        new("UIStroke", {
+            Color = color,
+            Thickness = math.max(1, math.floor(size / 2))
+        }, circle)
+    end
+end
+
+Hooks["Crosshair"] = function(on)
+    if on then
+        makeCrosshair()
+    else
+        destroyCrosshair()
+    end
+end
+
+Hooks["Crosshair Type"] = function()
+    if Values["Crosshair"] then makeCrosshair() end
+end
+
+Hooks["Crosshair Color"] = function()
+    if Values["Crosshair"] then makeCrosshair() end
+end
+
+Hooks["Crosshair Size"] = function()
+    if Values["Crosshair"] then makeCrosshair() end
+end
+
+Hooks["Crosshair X Offset"] = function()
+    if Values["Crosshair"] then makeCrosshair() end
+end
+
+Hooks["Crosshair Y Offset"] = function()
+    if Values["Crosshair"] then makeCrosshair() end
+end
+
+-- =========================================================
+-- LOCAL AIM TARGET TEST
+-- =========================================================
+
+local AimLock = {
+    target = nil
+}
+
+_G.AlettaAimLock = AimLock
+
+local function aimPartFor(characterModel)
+    local targetMode = Values["Target Aim"] or "Torso"
+
+    if targetMode == "Head" then
+        return characterModel:FindFirstChild("Head")
+            or characterModel:FindFirstChild("HumanoidRootPart")
+    elseif targetMode == "Legs" then
+        return characterModel:FindFirstChild("LeftFoot")
+            or characterModel:FindFirstChild("HumanoidRootPart")
+    end
+
+    return characterModel:FindFirstChild("UpperTorso")
+        or characterModel:FindFirstChild("Torso")
+        or characterModel:FindFirstChild("HumanoidRootPart")
+end
+
+local function hasLineOfSight(origin, part, targetCharacter)
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Exclude
+    params.FilterDescendantsInstances = {character(), targetCharacter}
+
+    local result = workspace:Raycast(
+        origin,
+        part.Position - origin,
+        params
+    )
+
+    return result == nil
+end
+
+local function getAimTarget()
+    camera = workspace.CurrentCamera or camera
+    if not camera then return nil end
+
+    local myRoot = root()
+    if not myRoot then return nil end
+
+    local maxPixels = tonumber(Values["Pistol FOV Radius"]) or 120
+    local maxWorldDistance = 80
+    local targetMode = Values["Pistol Target"] or "Killer"
+
+    local bestPart
+    local bestScore = math.huge
+
+    for _, targetPlayer in ipairs(Players:GetPlayers()) do
+        if targetPlayer ~= player then
+            local targetCharacter = targetPlayer.Character
+            local targetHumanoid = targetCharacter
+                and targetCharacter:FindFirstChildOfClass("Humanoid")
+            local targetRoot = targetCharacter
+                and targetCharacter:FindFirstChild("HumanoidRootPart")
+
+            if targetCharacter and targetHumanoid and targetRoot
+                and targetHumanoid.Health > 0 then
+
+                local validRole = true
+                local role = targetCharacter:GetAttribute("Role")
+                    or targetPlayer:GetAttribute("Role")
+
+                if targetMode == "Killer" then
+                    validRole = role == "Killer"
+                elseif targetMode == "Survivor" then
+                    validRole = role == "Survivor"
+                elseif targetMode == "Zombie" then
+                    validRole = role == "Zombie"
+                        or role == "Zombie Dummy"
+                        or role == "SCP"
+                end
+
+                if validRole then
+                    local part = aimPartFor(targetCharacter)
+
+                    if part then
+                        local worldDistance =
+                            (targetRoot.Position - myRoot.Position).Magnitude
+
+                        local screen, onScreen =
+                            camera:WorldToViewportPoint(part.Position)
+
+                        if onScreen and worldDistance <= maxWorldDistance then
+                            local center =
+                                Vector2.new(
+                                    camera.ViewportSize.X / 2,
+                                    camera.ViewportSize.Y / 2
+                                )
+
+                            local score =
+                                (Vector2.new(screen.X, screen.Y) - center).Magnitude
+
+                            if score <= maxPixels
+                                and score < bestScore
+                                and hasLineOfSight(
+                                    camera.CFrame.Position,
+                                    part,
+                                    targetCharacter
+                                ) then
+
+                                bestScore = score
+                                bestPart = part
+                            end
+                        end
+                    end
+                end
             end
         end
     end
-    table.sort(out)
-    return #out > 0 and out or {"No NPC found"}
+
+    return bestPart
 end
 
-local islandNames = {
-    "Fisherman Island", "Ocean", "Tropical Grove", "Kohana Island", "Kohana Volcano",
-    "Coral Reefs", "Crater Island", "Esoteric Depths", "Lost Isle", "Sisyphus Statue",
-    "Treasure Room", "Ancient Jungle", "Sacred Temple", "Pirate Cove", "Crystal Depths",
-    "Pirate Treasure Room", "Arcadia"
+Hooks["Aim Lock"] = function(on)
+    if on then
+        FeatureManager:Connect("Aim Lock", RunService.RenderStepped, function()
+            AimLock.target = getAimTarget()
+        end)
+    else
+        AimLock.target = nil
+    end
+end
+
+function AimLock.GetTarget()
+    local target = AimLock.target
+
+    if target and target.Parent then
+        local h = target.Parent:FindFirstChildOfClass("Humanoid")
+        if h and h.Health > 0 then
+            return target
+        end
+    end
+
+    return nil
+end
+
+function AimLock.Clear()
+    AimLock.target = nil
+end
+
+-- =========================================================
+-- TOF SOUND SET
+-- =========================================================
+
+local TOF_SOUND_IDS = {
+    ["Sound 1"] = "rbxassetid://139664063118995",
+    ["Sound 2"] = "rbxassetid://115463636107842",
+    ["Sound 3"] = "rbxassetid://133644366455575",
+    ["Sound 4"] = "rbxassetid://114932123071822",
+    ["Sound 5"] = "rbxassetid://83971611350325",
 }
 
-Hooks["Save Current Location"] = function()
-    local root = getRoot()
-    if root then savedCFrame = root.CFrame end
-end
-Hooks["Teleport to Saved"] = function()
-    local root = getRoot()
-    if root and savedCFrame then root.CFrame = savedCFrame end
-end
-Hooks["Reset Saved Location"] = function() savedCFrame = nil end
-Hooks["Show Real Ping Panel"] = function()
-    print("[Aletta Fish It] Ping:", math.floor(player:GetNetworkPing() * 1000), "ms")
-end
-Hooks["Teleport to Selected Player"] = function()
-    local target = Players:FindFirstChild(tostring(Values["Select Player"] or ""))
-    local root, targetRoot = getRoot(), getRoot(target)
-    if root and targetRoot then root.CFrame = targetRoot.CFrame + Vector3.new(0, 3, 0) end
-end
-Hooks["Refresh Player List"] = function()
-    local options = playerOptions()
-    local control = Controls["Select Player"]
-    if control and control.setOptions then control.setOptions(options, options[1]) end
-    local trade = Controls["Trade Player"]
-    if trade and trade.setOptions then trade.setOptions(options, options[1]) end
-end
-Hooks["Refresh Trade List"] = Hooks["Refresh Player List"]
-Hooks["Refresh NPC List"] = function()
-    local options = npcOptions()
-    local control = Controls["Select NPC"]
-    if control and control.setOptions then control.setOptions(options, options[1]) end
-end
-Hooks["Refresh Island List"] = function()
-    local control = Controls["Select Island"]
-    if control and control.setOptions then control.setOptions(islandNames, Values["Select Island"] or islandNames[1]) end
-end
-Hooks["Refresh Event List"] = function()
-    local options = {"No event detected", "Event / Limited"}
-    local control = Controls["Select Event"]
-    if control and control.setOptions then control.setOptions(options, options[1]) end
-end
-Hooks["Refresh Shop"] = function() print("[Aletta Fish It] Shop refresh requested.") end
-Hooks["Buy Now"] = function() print("[Aletta Fish It] Buy action requires the game's supported purchase API.") end
-Hooks["Teleport to Island"] = function() print("[Aletta Fish It] Selected island:", Values["Select Island"]) end
-Hooks["Teleport to NPC"] = function() print("[Aletta Fish It] Selected NPC:", Values["Select NPC"]) end
-Hooks["Test Webhook"] = function() print("[Aletta Fish It] Webhook test requested.") end
-Hooks["Save Webhook"] = function() print("[Aletta Fish It] Webhook settings saved for this session.") end
-Hooks["Bypass Radar"] = function() print("[Aletta Fish It] Radar bypass is intentionally not implemented.") end
+local tofSound
 
-player.CharacterAdded:Connect(function()
-    task.wait(0.25)
-    if Values["Auto Teleport on Spawn"] and savedCFrame then
-        local root = getRoot()
-        if root then root.CFrame = savedCFrame end
+local function playTOFSound()
+    local selected = Values["Pilih Sound"] or "Sound 1"
+    local soundId = TOF_SOUND_IDS[selected] or TOF_SOUND_IDS["Sound 1"]
+
+    if not tofSound or not tofSound.Parent then
+        tofSound = Instance.new("Sound")
+        tofSound.Name = "AlettaTOFSound"
+        tofSound.Volume = 1
+        tofSound.RollOffMaxDistance = 100
+        tofSound.Parent = playerGui
+    end
+
+    tofSound.SoundId = soundId
+    tofSound.TimePosition = 0
+    pcall(function()
+        tofSound:Play()
+    end)
+end
+
+Hooks["Pilih Sound"] = function(value)
+    Values["Pilih Sound"] = tostring(value or "Sound 1")
+    if Values["Sound TOF"] then
+        playTOFSound()
+    end
+end
+
+Hooks["Sound TOF"] = function(on)
+    Values["Sound TOF"] = on == true
+    if Values["Sound TOF"] then
+        playTOFSound()
+    elseif tofSound then
+        pcall(function() tofSound:Stop() end)
+    end
+end
+
+-- =========================================================
+-- ANTI AFK / SERVER
+-- =========================================================
+
+Hooks["Stay Active (Anti AFK)"] = function(on)
+    if not on then return end
+
+    FeatureManager:Connect("Stay Active (Anti AFK)", player.Idled, function()
+        pcall(function()
+            VirtualUser:CaptureController()
+            VirtualUser:ClickButton2(Vector2.new())
+        end)
+    end)
+end
+
+Hooks["Rejoin Server"] = function()
+    pcall(function()
+        TeleportService:Teleport(game.PlaceId, player)
+    end)
+end
+
+local sessionConfigs = {}
+local autoloadConfig = nil
+
+local colorPresets = {
+    Black = Color3.fromRGB(8, 8, 10),
+    ["Dark Purple"] = Color3.fromRGB(18, 10, 30),
+    Purple = Color3.fromRGB(70, 35, 110),
+    Violet = Color3.fromRGB(105, 55, 170),
+    Blue = Color3.fromRGB(35, 90, 180),
+    ["Dark Blue"] = Color3.fromRGB(18, 30, 60),
+    Navy = Color3.fromRGB(15, 25, 45),
+    ["Dark Gray"] = Color3.fromRGB(28, 28, 32),
+    Cyan = Color3.fromRGB(30, 180, 200),
+    Pink = Color3.fromRGB(220, 80, 180),
+    Red = Color3.fromRGB(210, 60, 70),
+    Green = Color3.fromRGB(65, 190, 100),
+    Orange = Color3.fromRGB(230, 135, 45),
+    Yellow = Color3.fromRGB(230, 200, 55),
+    White = Color3.fromRGB(245, 245, 245),
+    ["Light Gray"] = Color3.fromRGB(205, 205, 210),
+    Gray = Color3.fromRGB(155, 155, 160),
+}
+
+local themePresets = {
+    ["BBot"] = {main="Black", accent="Purple", outline="White", font="White", background="Black"},
+    ["Fatality"] = {main="Dark Purple", accent="Red", outline="Red", font="White", background="Black"},
+    ["Jester"] = {main="Dark Purple", accent="Pink", outline="White", font="White", background="Purple"},
+    ["Mint"] = {main="Dark Gray", accent="Green", outline="White", font="White", background="Dark Gray"},
+    ["Tokyo Night"] = {main="Dark Purple", accent="Violet", outline="Purple", font="White", background="Dark Purple"},
+    ["Ubuntu"] = {main="Dark Gray", accent="Orange", outline="White", font="White", background="Dark Gray"},
+    ["Quartz"] = {main="Dark Gray", accent="Cyan", outline="White", font="White", background="Black"},
+}
+
+local fontMap = {
+    Fantast = Enum.Font.Fantasy,
+    Goth = Enum.Font.Gotham,
+    Jura = Enum.Font.Gotham,
+    Roboto = Enum.Font.Gotham,
+    RobotoMono = Enum.Font.Code,
+    SourceSans = Enum.Font.SourceSans,
+}
+
+local function applyConfigVisuals()
+    local mainName = Values["Main Color Value"] or "Purple"
+    local accentName = Values["Accent Color Value"] or "Purple"
+    local outlineName = Values["Outline Color Value"] or "White"
+    local fontName = Values["Font Color Value"] or "White"
+    local bgName = Values["Background Color Value"] or "Dark Purple"
+
+    local mainColor = colorPresets[mainName] or ACCENT
+    local accentColor = colorPresets[accentName] or ACCENT
+    local outlineColor = colorPresets[outlineName] or Color3.new(1,1,1)
+    local fontColor = colorPresets[fontName] or TEXT
+    local bgColor = colorPresets[bgName] or BG
+
+    if Values["Main Color"] ~= false then
+        ACCENT = mainColor
+        PANEL = mainColor:Lerp(Color3.new(0,0,0), 0.55)
+        FIELD = mainColor:Lerp(Color3.new(0,0,0), 0.25)
+    end
+    if Values["Accent Color"] ~= false then
+        ACCENT = accentColor
+    end
+    if Values["Background Color"] ~= false then
+        BG = bgColor
+    end
+
+    window.BackgroundColor3 = BG
+    wStroke.Color = Values["Outline Color"] == false and Color3.new(1,1,1) or outlineColor
+    if bgDark then bgDark.BackgroundColor3 = BG:Lerp(Color3.new(0,0,0), 0.65) end
+    if logoBadge then
+        local stroke = logoBadge:FindFirstChildOfClass("UIStroke")
+        if stroke then stroke.Color = ACCENT end
+    end
+    if iconStroke then iconStroke.Color = outlineColor end
+
+    for _, obj in ipairs(window:GetDescendants()) do
+        if obj:IsA("TextLabel") or obj:IsA("TextButton") or obj:IsA("TextBox") then
+            if obj.TextColor3 == TEXT or obj.TextColor3 == Color3.fromRGB(220,220,220) then
+                obj.TextColor3 = fontColor
+            end
+        end
+    end
+
+    local face = fontMap[Values["Font Face"] or "Roboto"] or Enum.Font.Gotham
+    for _, obj in ipairs(window:GetDescendants()) do
+        if obj:IsA("TextLabel") or obj:IsA("TextButton") or obj:IsA("TextBox") then
+            obj.Font = face
+        end
+    end
+
+    for _, obj in ipairs(cornerObjects) do
+        if obj and obj.Parent then
+            obj.CornerRadius = UDim.new(0, math.clamp(tonumber(Values["Corner Radius"]) or 10, 0, 20))
+        end
+    end
+
+    for _, obj in ipairs(window:GetDescendants()) do
+        if obj:IsA("Frame") and obj.BackgroundColor3 == FIELD then
+            obj.BackgroundColor3 = FIELD
+        end
+    end
+end
+
+Hooks["Corner Radius"] = function(value)
+    Values["Corner Radius"] = math.clamp(tonumber(value) or 10, 0, 20)
+    applyConfigVisuals()
+end
+
+Hooks["Custom Cursor"] = function(on)
+    pcall(function()
+        UIS.MouseIconEnabled = not on
+    end)
+end
+
+Hooks["Lock GUI"] = function(on)
+    Values["Lock GUI"] = on == true
+end
+
+Hooks["Menu Bind"] = function(value)
+    Values["Menu Bind"] = typeof(value) == "EnumItem" and value or (Enum.KeyCode[tostring(value)] or Enum.KeyCode.RightShift)
+end
+
+local function themeValue(name)
+    return colorPresets[name] or ACCENT
+end
+
+for _, key in ipairs({"Background Color Value", "Main Color Value", "Accent Color Value", "Outline Color Value", "Font Color Value", "Font Face"}) do
+    Hooks[key] = function() applyConfigVisuals() end
+end
+
+Hooks["Theme List"] = function(theme)
+    local t = themePresets[theme]
+    if not t then return end
+    local map = {
+        ["Background Color Value"] = t.background,
+        ["Main Color Value"] = t.main,
+        ["Accent Color Value"] = t.accent,
+        ["Outline Color Value"] = t.outline,
+        ["Font Color Value"] = t.font,
+    }
+    for key, value in pairs(map) do
+        Values[key] = value
+        if Controls[key] and Controls[key].set then
+            Controls[key].set(value)
+        end
+    end
+    applyConfigVisuals()
+end
+
+local function configSnapshot()
+    local snapshot = {}
+    for key, value in pairs(Values) do
+        if typeof(value) == "EnumItem" then
+            snapshot[key] = value.Name
+        elseif type(value) ~= "table" then
+            snapshot[key] = value
+        end
+    end
+    return snapshot
+end
+
+local function applySnapshot(snapshot)
+    if type(snapshot) ~= "table" then return end
+    for key, value in pairs(snapshot) do
+        local control = Controls[key]
+        if control and control.set then
+            pcall(function() control.set(value) end)
+        else
+            Values[key] = value
+        end
+    end
+    applyConfigVisuals()
+end
+
+local function configNames()
+    local names = {}
+    for name in pairs(sessionConfigs) do table.insert(names, name) end
+    table.sort(names)
+    if #names == 0 then names[1] = "No Config" end
+    return names
+end
+
+local function refreshConfigDropdown(selected)
+    local list = configNames()
+    local current = selected or Values["Config List"]
+    if not sessionConfigs[current] and current ~= "No Config" then
+        current = list[1]
+    end
+    Values["Config List"] = current
+    local control = Controls["Config List"]
+    if control and control.setOptions then
+        control.setOptions(list, current)
+    elseif control and control.set then
+        control.set(current)
+    end
+    return list
+end
+
+Hooks["Create Config"] = function()
+    local name = tostring(Values["Config Name"] or ""):gsub("^%s+", ""):gsub("%s+$", "")
+    if name == "" then
+        warn("[Aletta] Config Name masih kosong.")
+        return
+    end
+    sessionConfigs[name] = configSnapshot()
+    refreshConfigDropdown(name)
+    print("[Aletta] Config dibuat:", name)
+end
+
+Hooks["Load Config"] = function()
+    local name = Values["Config List"]
+    local snapshot = sessionConfigs[name]
+    if snapshot then
+        applySnapshot(snapshot)
+        print("[Aletta] Config dimuat:", name)
+    end
+end
+
+Hooks["Overwrite Config"] = function()
+    local name = Values["Config List"]
+    if not sessionConfigs[name] then return end
+    sessionConfigs[name] = configSnapshot()
+    print("[Aletta] Config ditimpa:", name)
+end
+
+Hooks["Delete Config"] = function()
+    local name = Values["Config List"]
+    if name and sessionConfigs[name] then
+        sessionConfigs[name] = nil
+        refreshConfigDropdown()
+        print("[Aletta] Config dihapus:", name)
+    end
+end
+
+Hooks["Refresh List"] = function()
+    refreshConfigDropdown()
+end
+
+Hooks["Set as Autoload"] = function()
+    local name = Values["Config List"]
+    if sessionConfigs[name] then
+        autoloadConfig = name
+        print("[Aletta] Autoload:", name)
+    end
+end
+
+Hooks["Reset Autoload"] = function()
+    autoloadConfig = nil
+    print("[Aletta] Autoload di-reset.")
+end
+
+Hooks["Save Config Now"] = function()
+    local name = tostring(Values["Config Name"] or "Session")
+    sessionConfigs[name] = configSnapshot()
+    print("[Aletta] Config snapshot disimpan di sesi:", name)
+end
+
+Hooks["Reset to Default"] = function()
+    for name, default in pairs(Defaults) do
+        local control = Controls[name]
+        if control and control.set then
+            pcall(function() control.set(default) end)
+        else
+            Values[name] = default
+        end
+    end
+    applyConfigVisuals()
+end
+
+Hooks["Delete Config File"] = function()
+    print("[Aletta] Build ini tidak memakai filesystem exploit; gunakan Configuration untuk config sesi.")
+end
+
+-- =========================================================
+-- INFO / SOCIAL / SERVER
+-- =========================================================
+
+local function openExternalUrl(url)
+    local ok = pcall(function()
+        GuiService:OpenBrowserWindow(url)
+    end)
+    if not ok then
+        warn("[Aletta] Browser tidak dapat dibuka otomatis: " .. tostring(url))
+    end
+end
+
+local function copyText(value)
+    if type(setclipboard) == "function" then
+        local ok = pcall(setclipboard, tostring(value))
+        if ok then return true end
+    end
+    print("[Aletta] Copy value:", tostring(value))
+    return false
+end
+
+Hooks["Join Discord"] = function()
+    openExternalUrl("https://discord.gg/JGNVEK6s7")
+end
+
+Hooks["Open TikTok"] = function()
+    openExternalUrl("https://www.tiktok.com/@alettamelindaw?_r=1&_t=ZS-9A37fLCEEYZ")
+end
+
+Hooks["Copy Server ID"] = function()
+    copyText(game.JobId)
+end
+
+Hooks["Rejoin Server"] = function()
+    pcall(function()
+        TeleportService:Teleport(game.PlaceId, player)
+    end)
+end
+
+Hooks["Server Hop"] = function()
+    -- Tanpa HTTP/server-list eksternal: minta matchmaking Roblox membuat sesi baru.
+    pcall(function()
+        TeleportService:TeleportAsync(game.PlaceId, {player})
+    end)
+end
+
+Hooks["Destroy UI"] = function()
+    if gui and gui.Parent then
+        gui:Destroy()
+    end
+end
+
+-- =========================================================
+-- EMOTE TEST
+-- =========================================================
+
+Hooks["Play Emote"] = function()
+    local h = humanoid()
+    if not h then return end
+
+    local animator = h:FindFirstChildOfClass("Animator")
+    if not animator then return end
+
+    print("[Aletta] Selected emote:", Values["Select Emote"])
+    print("[Aletta] Masukkan AnimationId resmi project jika ingin memainkan animasi.")
+end
+
+Hooks["Stop Emote"] = function()
+    local h = humanoid()
+    if not h then return end
+
+    for _, track in ipairs(h:GetPlayingAnimationTracks()) do
+        pcall(function()
+            track:Stop(0.15)
+        end)
+    end
+end
+
+-- =========================================================
+-- ESP
+-- =========================================================
+
+espFolder = Instance.new("Folder")
+espFolder.Name = "AlettaESP"
+espFolder.Parent = workspace
+
+espGui = Instance.new("ScreenGui")
+espGui.Name = "AlettaESPLabels"
+espGui.ResetOnSpawn = false
+espGui.IgnoreGuiInset = true
+espGui.Parent = playerGui
+
+local espColorMap = {
+    Survivor = Color3.fromRGB(70, 220, 255),
+    Killer = Color3.fromRGB(255, 80, 80),
+    Zombie = Color3.fromRGB(190, 70, 255),
+    Generator = Color3.fromRGB(255, 235, 50),
+    Gate = Color3.fromRGB(255, 190, 50),
+    Hook = Color3.fromRGB(255, 90, 130),
+    Pallet = Color3.fromRGB(255, 150, 50)
+}
+
+local function clearESP()
+    if espFolder then
+        for _, object in ipairs(espFolder:GetChildren()) do
+            object:Destroy()
+        end
+    end
+
+    if espGui then
+        for _, object in ipairs(espGui:GetChildren()) do
+            object:Destroy()
+        end
+    end
+end
+
+local function roleOf(targetPlayer)
+    local c = targetPlayer.Character
+
+    local role = (c and c:GetAttribute("Role"))
+        or targetPlayer:GetAttribute("Role")
+
+    return role and tostring(role) or "Survivor"
+end
+
+local function espColor(role)
+    local customName
+
+    if role == "Survivor" then
+        customName = "Survivor Color"
+    elseif role == "Killer" then
+        customName = "Killer Color"
+    else
+        customName = "Zombie Dummy Color"
+    end
+
+    local custom = Values[customName]
+
+    local map = {
+        Purple = ACCENT,
+        Red = Color3.fromRGB(255, 70, 70),
+        Green = Color3.fromRGB(70, 255, 100),
+        Blue = Color3.fromRGB(70, 140, 255),
+        Cyan = Color3.fromRGB(60, 220, 255),
+        Yellow = Color3.fromRGB(255, 220, 50),
+        Orange = Color3.fromRGB(255, 150, 50),
+        White = TEXT
+    }
+
+    return map[custom] or espColorMap[role] or ACCENT
+end
+
+local function addCharacterESP(targetPlayer)
+    if targetPlayer == player then return end
+
+    local c = targetPlayer.Character
+    local h = c and c:FindFirstChildOfClass("Humanoid")
+    local targetRoot = c and c:FindFirstChild("HumanoidRootPart")
+
+    if not c or not h or not targetRoot or h.Health <= 0 then return end
+
+    local role = roleOf(targetPlayer)
+
+    if role == "Killer" and not Values["ESP Killer"] then return end
+    if role == "Survivor" and not Values["ESP Survivor"] then return end
+    if role ~= "Killer" and role ~= "Survivor"
+        and not Values["ESP Zombie Dummy"] then
+        return
+    end
+
+    local color = espColor(role)
+
+    local highlight = Instance.new("Highlight")
+    highlight.Adornee = c
+    highlight.FillTransparency = 0.82
+    highlight.OutlineTransparency = 0
+    highlight.OutlineColor = color
+    highlight.FillColor = color
+    highlight.Parent = espFolder
+
+    if Values["Show Name"]
+        or Values["Show Distance"]
+        or Values["Show Health"] then
+
+        local billboard = Instance.new("BillboardGui")
+        billboard.Adornee = targetRoot
+        billboard.Size = UDim2.fromOffset(180, 45)
+        billboard.StudsOffset = Vector3.new(0, 3, 0)
+        billboard.AlwaysOnTop = true
+        billboard.Parent = espFolder
+
+        local text = Instance.new("TextLabel")
+        text.BackgroundTransparency = 1
+        text.Size = UDim2.fromScale(1, 1)
+        text.Font = Enum.Font.GothamBold
+        text.TextSize = 12
+        text.TextColor3 = color
+        text.TextStrokeTransparency = 0.2
+        text.Parent = billboard
+
+        local parts = {}
+
+        if Values["Show Name"] then
+            table.insert(parts, targetPlayer.Name)
+        end
+
+        if Values["Show Health"] then
+            table.insert(parts, "[" .. math.floor(h.Health) .. " HP]")
+        end
+
+        if Values["Show Distance"] then
+            local myRoot = root()
+
+            if myRoot then
+                table.insert(
+                    parts,
+                    "[" .. math.floor(
+                        (myRoot.Position - targetRoot.Position).Magnitude
+                    ) .. " M]"
+                )
+            end
+        end
+
+        text.Text = table.concat(parts, " ")
+        billboard.Parent = espGui
+    end
+end
+
+local function objectKind(object)
+    local name = object.Name:lower()
+
+    if name:find("generator") then
+        return "Generator"
+    elseif name:find("gate") or name:find("exit") then
+        return "Gate"
+    elseif name:find("hook") or name:find("scourge") then
+        return "Hook"
+    elseif name:find("pallet") then
+        return "Pallet"
+    end
+
+    return nil
+end
+
+local function addObjectESP(object, kind)
+    if kind == "Generator" and not Values["ESP Generator"] then return end
+    if kind == "Gate" and not Values["ESP Gate"] then return end
+    if kind == "Hook" and not Values["ESP Hook"] then return end
+    if kind == "Pallet" and not Values["ESP Pallet"] then return end
+
+    local part = object:IsA("BasePart")
+        and object
+        or object:FindFirstChildWhichIsA("BasePart", true)
+
+    if not part then return end
+
+    local map = {
+        Purple = ACCENT,
+        Red = Color3.fromRGB(255, 70, 70),
+        Green = Color3.fromRGB(70, 255, 100),
+        Blue = Color3.fromRGB(70, 140, 255),
+        Cyan = Color3.fromRGB(60, 220, 255),
+        Yellow = Color3.fromRGB(255, 220, 50),
+        Orange = Color3.fromRGB(255, 150, 50),
+        White = TEXT,
+        Pink = Color3.fromRGB(255, 100, 200)
+    }
+
+    local color = map[Values[kind .. " Color"]] or espColorMap[kind]
+
+    local highlight = Instance.new("Highlight")
+    highlight.Adornee = object
+    highlight.FillTransparency = 0.88
+    highlight.OutlineColor = color
+    highlight.FillColor = color
+    highlight.Parent = espFolder
+
+    if Values["Show Name"] or Values["Show Distance"] then
+        local billboard = Instance.new("BillboardGui")
+        billboard.Adornee = part
+        billboard.Size = UDim2.fromOffset(150, 30)
+        billboard.StudsOffset = Vector3.new(0, 2.5, 0)
+        billboard.AlwaysOnTop = true
+        billboard.Parent = espFolder
+
+        local text = Instance.new("TextLabel")
+        text.BackgroundTransparency = 1
+        text.Size = UDim2.fromScale(1, 1)
+        text.Font = Enum.Font.GothamBold
+        text.TextSize = 12
+        text.TextColor3 = color
+        text.TextStrokeTransparency = 0.2
+        text.Parent = billboard
+
+        local displayText = Values["Show Name"] and object.Name or kind
+        local myRoot = root()
+
+        if Values["Show Distance"] and myRoot then
+            displayText = displayText .. " [" ..
+                math.floor((myRoot.Position - part.Position).Magnitude) ..
+                " M]"
+        end
+
+        text.Text = displayText
+        billboard.Parent = espGui
+    end
+end
+
+local function rebuildESP()
+    clearESP()
+
+    if not Values["Enable ESP"] then return end
+
+    for _, targetPlayer in ipairs(Players:GetPlayers()) do
+        addCharacterESP(targetPlayer)
+    end
+
+    for _, object in ipairs(workspace:GetDescendants()) do
+        local kind = objectKind(object)
+
+        if kind and (object:IsA("Model") or object:IsA("BasePart")) then
+            addObjectESP(object, kind)
+        end
+    end
+end
+
+Hooks["Enable ESP"] = function(on)
+    if on then
+        rebuildESP()
+
+        local lastRebuild = 0
+
+        FeatureManager:Connect("Enable ESP", RunService.Heartbeat, function()
+            local now = os.clock()
+
+            if now - lastRebuild >= 1 then
+                lastRebuild = now
+                rebuildESP()
+            end
+        end)
+    else
+        clearESP()
+    end
+end
+
+for _, name in ipairs({
+    "ESP Survivor",
+    "ESP Killer",
+    "ESP Zombie Dummy",
+    "ESP Generator",
+    "ESP Gate",
+    "ESP Hook",
+    "ESP Pallet",
+    "Show Name",
+    "Show Distance",
+    "Show Health",
+    "Survivor Color",
+    "Killer Color",
+    "Zombie Dummy Color",
+    "Generator Color",
+    "Gate Color",
+    "Hook Color",
+    "Pallet Color"
+}) do
+    Hooks[name] = function()
+        if Values["Enable ESP"] then
+            rebuildESP()
+        end
+    end
+end
+
+-- =========================================================
+-- MOONWALK
+-- =========================================================
+
+local function setMWIndicator(on)
+    if not mwGui then
+        mwGui = Instance.new("ScreenGui")
+        mwGui.Name = "AlettaMWIndicator"
+        mwGui.ResetOnSpawn = false
+        mwGui.IgnoreGuiInset = true
+        mwGui.Parent = playerGui
+
+        mwButton = Instance.new("TextButton")
+        mwButton.Size = UDim2.fromOffset(64, 42)
+        mwButton.Position = UDim2.new(1, -86, 1, -190)
+        mwButton.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+        mwButton.TextColor3 = TEXT
+        mwButton.Font = Enum.Font.GothamBold
+        mwButton.TextSize = 16
+        mwButton.Text = "MW"
+        mwButton.Visible = false
+        mwButton.Parent = mwGui
+        corner(mwButton, 21)
+
+        local stroke = Instance.new("UIStroke")
+        stroke.Thickness = 2
+        stroke.Parent = mwButton
+
+        mwButton.Activated:Connect(function()
+            FeatureManager:Toggle("Enable Moonwalk (Hold Hotkey/Button)")
+        end)
+    end
+
+    mwButton.Visible = on
+    mwButton.BackgroundColor3 =
+        on and ACCENT or Color3.fromRGB(30, 30, 30)
+end
+
+Hooks["Enable Moonwalk (Hold Hotkey/Button)"] = function(on)
+    setMWIndicator(on)
+
+    if not on then return end
+
+    FeatureManager:Connect(
+        "Enable Moonwalk (Hold Hotkey/Button)",
+        RunService.RenderStepped,
+        function()
+            local c = character()
+            local h = humanoid()
+            local r = root()
+
+            if not c or not h or not r then return end
+
+            camera = workspace.CurrentCamera or camera
+            if not camera then return end
+
+            local look = camera.CFrame.LookVector
+            local flat = Vector3.new(look.X, 0, look.Z)
+
+            if flat.Magnitude > 0.05 then
+                r.CFrame = CFrame.lookAt(
+                    r.Position,
+                    r.Position + flat.Unit
+                )
+            end
+        end
+    )
+end
+
+-- =========================================================
+-- SAFE GAME-SPECIFIC TEST HANDLERS
+-- =========================================================
+
+-- =========================================================
+-- MISC LOCAL/TEST HOOKS
+-- =========================================================
+
+local miscOriginal = {
+    CameraMaxZoomDistance = camera and camera.CameraType == Enum.CameraType.Custom and player.CameraMaxZoomDistance or nil,
+    WalkSpeed = nil,
+    JumpPower = nil,
+    LightingBrightness = Lighting.Brightness,
+    ClockTime = Lighting.ClockTime,
+    FogEnd = Lighting.FogEnd
+}
+
+local function getHumanoid()
+    local character = player.Character
+    return character and character:FindFirstChildOfClass("Humanoid")
+end
+
+Hooks["Camera DBD"] = function(on)
+    Values["Camera DBD"] = on == true
+end
+
+Hooks["Camera Height"] = function(value)
+    Values["Camera Height"] = tonumber(value) or 0
+end
+
+Hooks["Camera Stiffness"] = function(value)
+    Values["Camera Stiffness"] = tonumber(value) or 0
+end
+
+Hooks["Custom Resolution"] = function(on)
+    Values["Custom Resolution"] = on == true
+    print("[Aletta] Custom Resolution is a GUI/test setting; Roblox client resolution is not changed by this LocalScript.")
+end
+
+Hooks["Noclip"] = function(on)
+    if not on then return end
+    print("[Aletta] Noclip enabled as a test toggle. Server collision/validation remains authoritative.")
+end
+
+Hooks["FullBright"] = function(on)
+    if on then
+        Lighting.Brightness = 3
+        Lighting.ClockTime = 14
+        Lighting.FogEnd = 100000
+    else
+        Lighting.Brightness = miscOriginal.LightingBrightness or Lighting.Brightness
+        Lighting.ClockTime = miscOriginal.ClockTime or Lighting.ClockTime
+        Lighting.FogEnd = miscOriginal.FogEnd or Lighting.FogEnd
+    end
+end
+
+Hooks["Fullbright Time"] = function(value)
+    Values["Fullbright Time"] = tonumber(value) or 16
+    if Values["FullBright"] then
+        Lighting.ClockTime = Values["Fullbright Time"]
+    end
+end
+
+Hooks["Infinite Zoom"] = function(on)
+    if on then
+        player.CameraMaxZoomDistance = 100000
+    else
+        player.CameraMaxZoomDistance = miscOriginal.CameraMaxZoomDistance or 128
+    end
+end
+
+Hooks["High Jump"] = function(on)
+    local h = getHumanoid()
+    if not h then return end
+    if on then
+        miscOriginal.JumpPower = h.JumpPower
+        h.JumpPower = tonumber(Values["Jump Power"]) or 50
+    else
+        h.JumpPower = miscOriginal.JumpPower or 50
+    end
+end
+
+Hooks["Jump Power"] = function(value)
+    Values["Jump Power"] = tonumber(value) or 50
+    if Values["High Jump"] then
+        local h = getHumanoid()
+        if h then h.JumpPower = Values["Jump Power"] end
+    end
+end
+
+Hooks["Skip Cutscene"] = function(on)
+    if on then
+        print("[Aletta] Skip Cutscene ON - hook game-specific diperlukan untuk memutus cutscene dengan aman.")
+    end
+end
+
+Hooks["Invisible GUI"] = function(on)
+    if gui then
+        window.Visible = not on
+    end
+end
+
+Hooks["Unlock FPS"] = function(on)
+    print("[Aletta] Unlock FPS:", on, "Target FPS:", Values["Target FPS"] or "60")
+end
+
+Hooks["Target FPS"] = function(value)
+    Values["Target FPS"] = value
+    print("[Aletta] Target FPS set to", tostring(value), "(display setting)")
+end
+
+local gameSpecific = {
+    "Invisible",
+    "Speed Boost",
+    "No Fall Damage",
+    "Flee Killer (Auto TP Menjauh)",
+    "Auto Gen Rush",
+    "Bypass Generator",
+    "Enable Auto Skillcheck Perfect",
+    "King's Scourge",
+    "Bypass Gate",
+    "Instant Teleport (Gate)",
+    "Perfect Vault",
+    "Flowstate",
+    "Quick Recovery",
+    "Self Progress Heal",
+    "Auto Heal Team",
+    "Auto Parry V1",
+    "Auto Parry V2",
+    "Safety Parry",
+    "Aggressive Parry V1",
+    "Enable Auto Hook",
+    "Kill All (Risk Ban)",
+    "Auto Attack (No Animation)",
+    "No Flashlight (Anti Blind)",
+    "Drop All Pallets Instantly",
+    "No Cooldown (M2 & Q) [Hidden]",
+    "No Cooldown (Q & M2) [Myers]",
+    "No Cooldown (M2 & Q) [Abysswalker]",
+    "Infinite Frenzy [Jeff]",
+    "Infinite Pursuit & Invis [Jason]",
+    "Hidden M2 Aimbot (Nearest Visible)",
+    "Trigger Auto Parry (Fake Hit)",
+    "Instant Break (Pallet & Gen)",
+    "Silent Flask (The Cure)",
+    "Auto Aim Senter ke Killer",
+    "Auto Prediksi",
+    "Veil",
+    "Enable Custom Animation",
+    "Enable Avatar Changer",
+    "Predict Killer",
+    "Skip Cutscenes"
+}
+
+for _, name in ipairs(gameSpecific) do
+    if not Hooks[name] then
+        Hooks[name] = function(value)
+            Values[name] = value
+
+            if value == true then
+                print("[Aletta] " .. name ..
+                    " ON - menunggu integrasi resmi project/server.")
+            end
+        end
+    end
+end
+
+Hooks["Bypass Generator"] = function(on)
+    if not on then return end
+
+    print("[Aletta] Generator test enabled.")
+    print("[Aletta] Gunakan interaksi/proses server resmi project untuk aksi generator.")
+end
+
+Hooks["Enable Auto Skillcheck Perfect"] = function(on)
+    if on then
+        print("[Aletta] Auto Skillcheck test ON.")
+        print("[Aletta] Handler skillcheck server/client resmi diperlukan untuk aksi nyata.")
+    end
+end
+
+-- =========================================================
+-- HOTKEYS
+-- =========================================================
+
+local hotkeyMap = {
+    ["Speed Boost Hotkey"] = "Speed Boost",
+    ["Moonwalk Hotkey"] = "Enable Moonwalk (Hold Hotkey/Button)",
+    ["God Mode Hotkey"] = "Enable God Mode Shortcut",
+    ["Self Heal Hotkey"] = "Enable Self Heal Shortcut",
+    ["Beat Game Hotkey"] = "Enable Beat Game Shortcut",
+    ["Auto Parry V1 Hotkey"] = "Auto Parry V1",
+    ["Auto Parry V2 Hotkey"] = "Auto Parry V2",
+    ["Hotkey PC"] = "Enable Drop Pallet Shortcut",
+    ["Toggle Hotkey"] = "Enable Mask Selection GUI",
+    ["Pistol Hotkey"] = "Pistol",
+    ["Auto Prediksi Hotkey"] = "Auto Prediksi",
+    ["Mobile Target Shortcut Key"] = "Show Mobile Target Shortcut",
+    ["Veil Hotkey"] = "Veil",
+    ["Self Progress Heal Hotkey"] = "Self Progress Heal"
+}
+
+UIS.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.UserInputType ~= Enum.UserInputType.Keyboard then return end
+
+    if Values["Open Keybind"] ~= false and input.KeyCode == (Values["Menu Bind"] or Enum.KeyCode.RightShift) then
+        if Values["Lock GUI"] == true then
+            -- Lock GUI only blocks dragging; menu bind still works.
+        end
+        window.Visible = not window.Visible
+        icon.Visible = true
+        closePopup()
+        return
+    end
+
+    for hotkeyName, featureName in pairs(hotkeyMap) do
+        local key = Values[hotkeyName]
+
+        if typeof(key) == "EnumItem" and key == input.KeyCode then
+            if Values[featureName] ~= nil then
+                FeatureManager:Toggle(featureName)
+            end
+        end
     end
 end)
 
--- Initial dynamic lists.
-task.defer(function()
-    if Controls["Select Player"] then Hooks["Refresh Player List"]() end
-    if Controls["Select NPC"] then Hooks["Refresh NPC List"]() end
+-- =========================================================
+-- CHARACTER RESPAWN
+-- =========================================================
+
+player.CharacterAdded:Connect(function()
+    task.wait(0.25)
+
+    if Values["Enable Run Speed"] and Hooks["Enable Run Speed"] then
+        pcall(function()
+            Hooks["Enable Run Speed"](true)
+        end)
+    end
+
+    if Values["Custom FOV"] and Hooks["Custom FOV"] then
+        pcall(function()
+            Hooks["Custom FOV"](true)
+        end)
+    end
+
+    if Values["Enable ESP"] then
+        task.delay(0.5, rebuildESP)
+    end
 end)
 
--- Ensure the GUI remains a standalone Fish It UI.
-print("[Aletta Creator] Fish It - Fremium Edition loaded.")
-print("[Aletta Creator] Assets: 122038427201250 / 114593611204629 / 79108447755192")
+-- =========================================================
+-- CLEANUP
+-- =========================================================
+
+gui.Destroying:Connect(function()
+    FeatureManager:StopAll()
+    destroyCrosshair()
+    clearESP()
+
+    if mwGui then
+        mwGui:Destroy()
+        mwGui = nil
+        mwButton = nil
+    end
+end)
+
+print("[Aletta Creator] Loaded successfully.")
+print("[Aletta Creator] GUI icon asset:", ICON_ID)
+print("[Aletta Creator] FeatureManager:Toggle fixed.")
+print("[Aletta Creator] No lock emoji is used.")
+
+-- Initial Config visuals
+pcall(applyConfigVisuals)
+
+-- Tampilkan notifikasi saat script selesai dimuat.
+task.defer(showLoadNotification)

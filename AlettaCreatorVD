@@ -696,7 +696,7 @@ local wStroke = new("UIStroke", {
     Thickness = 2
 }, window)
 
-new("UIGradient", {
+local wGradient = new("UIGradient", {
     Color = ColorSequence.new({
         ColorSequenceKeypoint.new(0, Color3.fromRGB(120, 60, 255)),
         ColorSequenceKeypoint.new(0.5, Color3.fromRGB(200, 90, 255)),
@@ -747,28 +747,53 @@ local headerLogo = new("ImageLabel", {
 
 local headerTitle = new("TextLabel", {
     Name = "AlettaCreatorTitle",
-    Text = "「 ✦  FREE FREMIUM  ✦ 」",
+    Text = "ALETTA CREATOR",
     Font = Enum.Font.GothamBlack,
     TextSize = 16,
-    TextColor3 = Color3.fromRGB(235, 205, 255),
-    TextStrokeColor3 = Color3.fromRGB(70, 20, 120),
-    TextStrokeTransparency = 0.15,
+    TextColor3 = TEXT,
     BackgroundTransparency = 1,
     Position = UDim2.fromOffset(62, 2),
-    Size = UDim2.fromOffset(250, 24),
+    Size = UDim2.fromOffset(230, 22),
     TextXAlignment = Enum.TextXAlignment.Left,
     ZIndex = 12
 }, top)
 
-new("TextLabel", {
-    Text = "✶ VIOLENCE DISTRICT ✶",
+local headerSubtitle = new("TextLabel", {
+    Name = "AlettaCreatorSubtitle",
+    Text = "VIOLENCE DISTRICT",
     Font = Enum.Font.GothamBold,
-    TextSize = 12,
-    TextColor3 = TEXT,
+    TextSize = 11,
+    TextColor3 = GRAY,
     BackgroundTransparency = 1,
     Position = UDim2.fromOffset(62, 25),
-    Size = UDim2.fromOffset(250, 20),
+    Size = UDim2.fromOffset(230, 18),
     TextXAlignment = Enum.TextXAlignment.Left,
+    ZIndex = 12
+}, top)
+
+local headerRightTitle = new("TextLabel", {
+    Name = "AlettaHeaderRightTitle",
+    Text = "AC SCRIPT",
+    Font = Enum.Font.GothamBlack,
+    TextSize = 13,
+    TextColor3 = TEXT,
+    BackgroundTransparency = 1,
+    Position = UDim2.new(1, -148, 0, 3),
+    Size = UDim2.fromOffset(108, 20),
+    TextXAlignment = Enum.TextXAlignment.Right,
+    ZIndex = 12
+}, top)
+
+local headerRightSubtitle = new("TextLabel", {
+    Name = "AlettaHeaderRightSubtitle",
+    Text = "ALETTA CREATOR",
+    Font = Enum.Font.GothamBold,
+    TextSize = 9,
+    TextColor3 = GRAY,
+    BackgroundTransparency = 1,
+    Position = UDim2.new(1, -148, 0, 24),
+    Size = UDim2.fromOffset(108, 17),
+    TextXAlignment = Enum.TextXAlignment.Right,
     ZIndex = 12
 }, top)
 
@@ -1504,7 +1529,7 @@ local iconStroke = new("UIStroke", {
     Thickness = 2.5
 }, icon)
 
-new("UIGradient", {
+local iconGradient = new("UIGradient", {
     Color = ColorSequence.new({
         ColorSequenceKeypoint.new(0, Color3.fromRGB(110, 50, 255)),
         ColorSequenceKeypoint.new(0.5, Color3.fromRGB(230, 110, 255)),
@@ -1600,6 +1625,20 @@ task.spawn(function()
             end
             if iconStroke then
                 iconStroke.Color = rainbowAccent
+            end
+            if wGradient then
+                wGradient.Color = ColorSequence.new({
+                    ColorSequenceKeypoint.new(0, Color3.fromHSV((hue + 0.00) % 1, 0.85, 1)),
+                    ColorSequenceKeypoint.new(0.5, Color3.fromHSV((hue + 0.33) % 1, 0.85, 1)),
+                    ColorSequenceKeypoint.new(1, Color3.fromHSV((hue + 0.66) % 1, 0.85, 1))
+                })
+            end
+            if iconGradient then
+                iconGradient.Color = ColorSequence.new({
+                    ColorSequenceKeypoint.new(0, Color3.fromHSV((hue + 0.00) % 1, 0.85, 1)),
+                    ColorSequenceKeypoint.new(0.5, Color3.fromHSV((hue + 0.33) % 1, 0.85, 1)),
+                    ColorSequenceKeypoint.new(1, Color3.fromHSV((hue + 0.66) % 1, 0.85, 1))
+                })
             end
 
             for _, obj in ipairs(window:GetDescendants()) do
@@ -2267,6 +2306,30 @@ local function hasLineOfSight(origin, part, targetCharacter)
     return result == nil
 end
 
+local function detectAimRole(targetPlayer)
+    if not targetPlayer then return nil end
+    local c=targetPlayer.Character
+    local function norm(v)
+        if v==nil then return nil end
+        local t=tostring(v):lower():gsub("%s+","")
+        if t:find("killer",1,true) then return "Killer" end
+        if t:find("survivor",1,true) then return "Survivor" end
+        if t:find("zombie",1,true) then return "Zombie" end
+        if t:find("scp",1,true) then return "SCP" end
+        return nil
+    end
+    local candidates={
+        c and c:GetAttribute("Role"), c and c:GetAttribute("RoleName"), c and c:GetAttribute("Team"),
+        targetPlayer:GetAttribute("Role"), targetPlayer:GetAttribute("RoleName"), targetPlayer:GetAttribute("Team"),
+        targetPlayer.Team and targetPlayer.Team.Name
+    }
+    for _,v in ipairs(candidates) do
+        local r=norm(v)
+        if r then return r end
+    end
+    return nil
+end
+
 local function getAimTarget()
     camera = workspace.CurrentCamera or camera
     if not camera then return nil end
@@ -2292,18 +2355,17 @@ local function getAimTarget()
             if targetCharacter and targetHumanoid and targetRoot
                 and targetHumanoid.Health > 0 then
 
+                -- Gunakan detector role yang sama dengan ESP: Role/RoleName/Team
+                -- sehingga target tetap ditemukan walau game tidak memakai Attribute("Role").
+                local detectedRole = detectAimRole(targetPlayer)
                 local validRole = true
-                local role = targetCharacter:GetAttribute("Role")
-                    or targetPlayer:GetAttribute("Role")
 
                 if targetMode == "Killer" then
-                    validRole = role == "Killer"
+                    validRole = detectedRole == "Killer"
                 elseif targetMode == "Survivor" then
-                    validRole = role == "Survivor"
+                    validRole = detectedRole == "Survivor"
                 elseif targetMode == "Zombie" then
-                    validRole = role == "Zombie"
-                        or role == "Zombie Dummy"
-                        or role == "SCP"
+                    validRole = detectedRole == "Zombie" or detectedRole == "SCP"
                 end
 
                 if validRole then
@@ -2429,7 +2491,8 @@ end
 local function predictedPosition(part)
     if not part then return nil end
     local v = part.AssemblyLinearVelocity or Vector3.zero
-    local p = math.clamp((tonumber(Values["Prediction"]) or 35) / 100, 0, 1)
+    -- Slider 35 = 0.35 detik lead, bukan 35 studs.
+    local p = math.clamp((tonumber(Values["Prediction"]) or 35) / 100, 0, 1.5)
     return part.Position + v * p
 end
 
@@ -2453,13 +2516,18 @@ Hooks["Enable Aimbot"] = function(on)
     end)
 end
 
+local function runPistolAim()
+    local target = getAimTarget()
+    if not target then return end
+    aimAtPredictedTarget(target)
+end
+
 Hooks["Pistol"] = function(on)
     disconnectList("Pistol Predict")
     updateAimFov()
     if not on then return end
     FeatureManager:Connect("Pistol Predict", RunService.RenderStepped, function()
-        local target = getAimTarget()
-        if target then aimAtPredictedTarget(target) end
+        runPistolAim()
     end)
 end
 
@@ -2467,14 +2535,13 @@ Hooks["Auto Prediksi"] = function(on)
     disconnectList("Auto Prediksi Aim")
     if not on then return end
     FeatureManager:Connect("Auto Prediksi Aim", RunService.RenderStepped, function()
-        local target = getAimTarget()
-        if target then aimAtPredictedTarget(target) end
+        runPistolAim()
     end)
 end
 
 Hooks["Pistol FOV Mode"] = function() updateAimFov() end
 Hooks["Pistol Target"] = function() end
-Hooks["Prediction"] = function(v) Values["Prediction"] = tonumber(v) or 35 end
+Hooks["Prediction"] = function(v) Values["Prediction"] = math.clamp(tonumber(v) or 35,0,150) end
 
 -- =========================================================
 -- KILLER PREDICTION PANEL
@@ -2668,6 +2735,11 @@ local fontMap = {
 }
 
 local function applyConfigVisuals()
+    local oldPanel = PANEL
+    local oldField = FIELD
+    local oldAccent = ACCENT
+    local oldBG = BG
+
     local mainName = Values["Main Color Value"] or "Purple"
     local accentName = Values["Accent Color Value"] or "Purple"
     local outlineName = Values["Outline Color Value"] or "White"
@@ -2734,9 +2806,62 @@ local function applyConfigVisuals()
     end
 
     for _, obj in ipairs(window:GetDescendants()) do
-        if obj:IsA("Frame") and obj.BackgroundColor3 == FIELD then
-            obj.BackgroundColor3 = FIELD
+        if obj:IsA("GuiObject") then
+            -- Recolor existing panels/fields created with the previous theme.
+            if obj.BackgroundTransparency < 1 then
+                if obj.BackgroundColor3 == oldPanel then
+                    obj.BackgroundColor3 = PANEL
+                elseif obj.BackgroundColor3 == oldField then
+                    obj.BackgroundColor3 = FIELD
+                elseif obj.BackgroundColor3 == oldAccent then
+                    obj.BackgroundColor3 = ACCENT
+                elseif obj.BackgroundColor3 == oldBG then
+                    obj.BackgroundColor3 = BG
+                end
+            end
+
+            if obj:IsA("ScrollingFrame") then
+                obj.ScrollBarImageColor3 = ACCENT
+            end
         end
+    end
+
+    -- Theme image is also the full GUI background.
+    if selectedTheme and selectedTheme.asset then
+        bgImg.Image = selectedTheme.asset
+        bgImg.ImageTransparency = 0.12
+        bgDark.BackgroundColor3 = BG:Lerp(Color3.new(0,0,0), 0.65)
+    end
+
+    -- Header and logo always follow the active theme.
+    if headerLogo then headerLogo.Image = (selectedTheme and selectedTheme.asset) or LOGO_ID end
+    if icon then
+        icon.Image = (selectedTheme and selectedTheme.asset) or LOGO_ID
+        icon.BackgroundColor3 = PANEL
+    end
+
+    headerTitle.TextColor3 = fontColor
+    headerSubtitle.TextColor3 = outlineColor:Lerp(fontColor, 0.25)
+    headerRightTitle.TextColor3 = fontColor
+    headerRightSubtitle.TextColor3 = outlineColor:Lerp(fontColor, 0.25)
+
+    -- Gradient stroke follows the active theme instead of staying purple.
+    local c1 = outlineColor
+    local c2 = accentColor
+    local c3 = mainColor
+    if wGradient then
+        wGradient.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, c1),
+            ColorSequenceKeypoint.new(0.5, c2),
+            ColorSequenceKeypoint.new(1, c3)
+        })
+    end
+    if iconGradient then
+        iconGradient.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, c1),
+            ColorSequenceKeypoint.new(0.5, c2),
+            ColorSequenceKeypoint.new(1, c3)
+        })
     end
 end
 
@@ -2796,6 +2921,7 @@ Hooks["Theme List"] = function(theme)
 
     if headerLogo then headerLogo.Image = t.asset end
     if icon then icon.Image = t.asset end
+    if bgImg then bgImg.Image = t.asset end
 
     applyConfigVisuals()
 end
@@ -3565,6 +3691,110 @@ end)
 -- =========================================================
 
 -- =========================================================
+-- VEIL AUTO AIM + PREDICTION
+-- =========================================================
+-- Target utama Veil adalah Survivor, karena Veil berada di sisi Killer.
+-- Tidak menebak payload Spearthrow; fitur ini mengarahkan kamera ke titik
+-- prediksi sehingga controller/game tetap menangani aksi lempar resminya.
+
+local function getVeilTarget()
+    local myRoot=root()
+    if not myRoot then return nil end
+
+    camera=workspace.CurrentCamera or camera
+    if not camera then return nil end
+
+    local best
+    local bestScore=math.huge
+    local maxDistance=math.clamp(tonumber(Values["Veil Distance"]) or 150,10,500)
+    local fovRadius=math.clamp(tonumber(Values["Veil FOV Radius"]) or 120,10,600)
+
+    for _,targetPlayer in ipairs(Players:GetPlayers()) do
+        if targetPlayer~=player then
+            local c=targetPlayer.Character
+            local h=c and c:FindFirstChildOfClass("Humanoid")
+            local r=c and getRootPart(c)
+            if h and h.Health>0 and r then
+                local role=detectESPExplicitRole(targetPlayer)
+                if role=="Survivor" then
+                    local d=(r.Position-myRoot.Position).Magnitude
+                    if d<=maxDistance then
+                        local targetPart=aimPartFor(c)
+                        if targetPart then
+                            local vp,onScreen=camera:WorldToViewportPoint(targetPart.Position)
+                            if onScreen and vp.Z>0 then
+                                local center=Vector2.new(camera.ViewportSize.X/2,camera.ViewportSize.Y/2)
+                                local score=(Vector2.new(vp.X,vp.Y)-center).Magnitude
+                                if score<=fovRadius and score<bestScore then
+                                    bestScore=score
+                                    best={player=targetPlayer,character=c,root=r,part=targetPart,distance=d}
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return best
+end
+
+local function getVeilPredictedPosition(target)
+    if not target or not target.part then return nil end
+    local speed=math.max(tonumber(Values["Spear Speed"]) or 165,1)
+    local lead=math.clamp((tonumber(Values["Smart Predict Lead"]) or 17)/100,0,1)
+    local velocity=target.part.AssemblyLinearVelocity or target.root.AssemblyLinearVelocity or Vector3.zero
+    if Values["Smart Predict Mode"] then
+        local flight=math.clamp((target.distance or 0)/speed,0,2)
+        return target.part.Position + velocity*flight*lead
+    end
+    return target.part.Position
+end
+
+local function aimVeilAtTarget()
+    local target=getVeilTarget()
+    if not target then return end
+    local predicted=getVeilPredictedPosition(target)
+    if not predicted then return end
+    camera=workspace.CurrentCamera or camera
+    if camera then
+        camera.CFrame=CFrame.lookAt(camera.CFrame.Position,predicted)
+    end
+    _G.AlettaVeilPredictionTarget={player=target.player,position=predicted,time=os.clock()}
+end
+
+Hooks["Veil"] = function(on)
+    disconnectList("Veil Auto Aim")
+    if not on then
+        _G.AlettaVeilPredictionTarget=nil
+        return
+    end
+    FeatureManager:Connect("Veil Auto Aim",RunService.RenderStepped,function()
+        aimVeilAtTarget()
+    end)
+end
+
+Hooks["Smart Predict Mode"] = function(on)
+    Values["Smart Predict Mode"]=on==true
+end
+
+Hooks["Smart Predict Lead"] = function(v)
+    Values["Smart Predict Lead"]=math.clamp(tonumber(v) or 17,0,50)
+end
+
+Hooks["Veil FOV Radius"] = function(v)
+    Values["Veil FOV Radius"]=math.clamp(tonumber(v) or 120,10,600)
+end
+
+Hooks["Veil Distance"] = function(v)
+    Values["Veil Distance"]=math.clamp(tonumber(v) or 150,10,500)
+end
+
+Hooks["Spear Speed"] = function(v)
+    Values["Spear Speed"]=math.clamp(tonumber(v) or 165,1,300)
+end
+
+-- =========================================================
 -- AUTO PARRY - PROJECT-LOCAL IMPLEMENTATION
 -- Uses the project's Parrying Dagger remote when it exists, with the normal
 -- Tool:Activate() path. Cooldown is fixed at 120 seconds.
@@ -3655,13 +3885,17 @@ local function getThreat()
 end
 local function sendParry()
     local now=os.clock()
-    if now-AutoParry.last<AutoParry.cooldown then return false end
+    local remaining=AutoParry.cooldown-(now-AutoParry.last)
+    if AutoParry.last>0 and remaining>0 then
+        return false
+    end
 
     local sent=false
     local h=humanoid()
     local tool=findParryTool()
 
-    -- Pastikan dagger benar-benar equipped sebelum Activate.
+    -- Satu trigger saja per siklus cooldown. Prioritaskan Tool:Activate()
+    -- karena itu jalur aksi dagger yang paling dekat dengan gameplay normal.
     if tool and tool.Parent~=character() and h then
         pcall(function() h:EquipTool(tool) end)
         task.wait()
@@ -3670,18 +3904,18 @@ local function sendParry()
 
     if tool and tool.Parent==character() then
         local ok=pcall(function() tool:Activate() end)
-        sent=ok or sent
-    end
-
-    -- Gunakan remote project hanya bila memang tersedia.
-    -- Tidak menebak parameter server.
-    local remote=findParryRemote()
-    if remote then
-        local ok=pcall(function() remote:FireServer() end)
-        sent=ok or sent
+        sent=ok
+    else
+        -- Fallback hanya jika Tool tidak tersedia.
+        local remote=findParryRemote()
+        if remote then
+            local ok=pcall(function() remote:FireServer() end)
+            sent=ok
+        end
     end
 
     if sent then
+        -- Mulai cooldown 120 detik segera setelah parry dikirim.
         AutoParry.last=os.clock()
     end
     return sent
@@ -3692,7 +3926,7 @@ end
 Hooks["Auto Parry"] = function(on)
     stopAutoParry(); setParryRangeVisual(on or Values["Safety Parry"] or Values["Aggressive Parry"])
     if not on then return end
-    AutoParry.armed=true; AutoParry.last=0
+    AutoParry.armed=true
     local result=findParryResultRemote()
     if result then FeatureManager:Connect("Auto Parry Result",result.OnClientEvent,function(...) AutoParry.lastResult=os.clock(); AutoParry.resultSeen=true end) end
     FeatureManager:Connect("Auto Parry",RunService.Heartbeat,function()
@@ -4043,6 +4277,7 @@ do
         BG = t.background
         if headerLogo then headerLogo.Image = t.asset end
         if icon then icon.Image = t.asset end
+        if bgImg then bgImg.Image = t.asset end
     end
 end
 

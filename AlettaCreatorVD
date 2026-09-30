@@ -22,6 +22,7 @@ local Lighting = game:GetService("Lighting")
 local TeleportService = game:GetService("TeleportService")
 local GuiService = game:GetService("GuiService")
 local VirtualUser = game:GetService("VirtualUser")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 --// SINGLE EXECUTE / KEEP LOADED
 --// Jika aktif, execute kedua tidak membuat GUI/fitur baru.
@@ -53,6 +54,243 @@ end
 local playerGui = player:WaitForChild("PlayerGui", 15)
 if not playerGui then
     warn("[Aletta] PlayerGui tidak ditemukan.")
+    return
+end
+
+-- =========================================================
+-- ALETTA CREATOR V15 - API KEY GATE
+-- =========================================================
+-- Verifikasi dilakukan melalui ServerScriptService bridge:
+-- ReplicatedStorage/AlettaCreatorRemotes/VerifyKey
+-- Server bridge meneruskan key + HWID ke API Vercel dan menambahkan UserId.
+-- Isi API URL hanya di ServerScript, BUKAN di LocalScript.
+--
+-- Catatan keamanan:
+-- Gate GUI berada di client sehingga bukan anti-tamper. Validasi server/API
+-- adalah source of truth untuk akses key. Jangan taruh ADMIN_TOKEN di sini.
+
+local AlettaKeyInfo = {
+    valid = false,
+    type = "UNKNOWN",
+    expiresAt = nil,
+    key = nil
+}
+
+local function formatExpiry(iso)
+    if not iso or tostring(iso) == "" then
+        return "Tidak diketahui"
+    end
+    local t = os.time({
+        year = tonumber(string.sub(iso, 1, 4)),
+        month = tonumber(string.sub(iso, 6, 7)),
+        day = tonumber(string.sub(iso, 9, 10)),
+        hour = tonumber(string.sub(iso, 12, 13)) or 0,
+        min = tonumber(string.sub(iso, 15, 16)) or 0,
+        sec = tonumber(string.sub(iso, 18, 19)) or 0
+    })
+    if not t then
+        return tostring(iso)
+    end
+    return os.date("%d/%m/%Y %H:%M:%S", t)
+end
+
+local function getClientIdentifier()
+    local ok, service = pcall(function()
+        return game:GetService("RbxAnalyticsService")
+    end)
+    if ok and service then
+        local ok2, id = pcall(function()
+            return service:GetClientId()
+        end)
+        if ok2 and id and tostring(id) ~= "" then
+            return tostring(id)
+        end
+    end
+    -- Fallback hanya sebagai identifier sesi; bukan HWID hardware asli.
+    return "SESSION-" .. tostring(player.UserId) .. "-" .. tostring(game.PlaceId)
+end
+
+local function keyGateNew(className, props, parent)
+    local obj = Instance.new(className)
+    for k, v in pairs(props or {}) do
+        pcall(function() obj[k] = v end)
+    end
+    if parent then obj.Parent = parent end
+    return obj
+end
+
+local function keyGateCorner(object, radius)
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0, radius)
+    c.Parent = object
+    return c
+end
+
+local function makeKeyGate()
+    local gate = keyGateNew("ScreenGui", {
+        Name = "AlettaPremiumKey",
+        ResetOnSpawn = false,
+        IgnoreGuiInset = true,
+        DisplayOrder = 10000,
+        ZIndexBehavior = Enum.ZIndexBehavior.Global
+    }, playerGui)
+
+    local backdrop = keyGateNew("Frame", {
+        Size = UDim2.fromScale(1, 1),
+        BackgroundColor3 = Color3.fromRGB(7, 4, 12),
+        BackgroundTransparency = 0.08
+    }, gate)
+
+    local card = keyGateNew("Frame", {
+        Size = UDim2.fromOffset(390, 300),
+        Position = UDim2.new(0.5, -195, 0.5, -150),
+        BackgroundColor3 = Color3.fromRGB(18, 12, 28),
+        BorderSizePixel = 0
+    }, backdrop)
+    keyGateCorner(card, 14)
+
+    local stroke = keyGateNew("UIStroke", {
+        Color = Color3.fromRGB(150, 80, 255),
+        Thickness = 2
+    }, card)
+
+    keyGateNew("TextLabel", {
+        Size = UDim2.new(1, -32, 0, 34),
+        Position = UDim2.fromOffset(16, 16),
+        BackgroundTransparency = 1,
+        Text = "ALETTA CREATOR V15",
+        Font = Enum.Font.GothamBold,
+        TextSize = 22,
+        TextColor3 = Color3.new(1, 1, 1),
+        TextXAlignment = Enum.TextXAlignment.Left
+    }, card)
+
+    keyGateNew("TextLabel", {
+        Size = UDim2.new(1, -32, 0, 28),
+        Position = UDim2.fromOffset(16, 52),
+        BackgroundTransparency = 1,
+        Text = "Masukkan Key untuk membuka Creator",
+        Font = Enum.Font.Gotham,
+        TextSize = 13,
+        TextColor3 = Color3.fromRGB(190, 180, 205),
+        TextXAlignment = Enum.TextXAlignment.Left
+    }, card)
+
+    local input = keyGateNew("TextBox", {
+        Size = UDim2.new(1, -32, 0, 46),
+        Position = UDim2.fromOffset(16, 92),
+        BackgroundColor3 = Color3.fromRGB(38, 30, 54),
+        BorderSizePixel = 0,
+        PlaceholderText = "ALETTA-PREM3D-XXXXXX-XXXXXX-XXXXXX",
+        PlaceholderColor3 = Color3.fromRGB(125, 115, 140),
+        Text = "",
+        ClearTextOnFocus = false,
+        Font = Enum.Font.GothamMedium,
+        TextSize = 13,
+        TextColor3 = Color3.new(1, 1, 1)
+    }, card)
+    keyGateCorner(input, 8)
+
+    local verify = keyGateNew("TextButton", {
+        Size = UDim2.new(1, -32, 0, 44),
+        Position = UDim2.fromOffset(16, 148),
+        BackgroundColor3 = Color3.fromRGB(150, 80, 255),
+        BorderSizePixel = 0,
+        Text = "VERIFY KEY",
+        Font = Enum.Font.GothamBold,
+        TextSize = 14,
+        TextColor3 = Color3.new(1, 1, 1),
+        AutoButtonColor = true
+    }, card)
+    keyGateCorner(verify, 8)
+
+    local status = keyGateNew("TextLabel", {
+        Size = UDim2.new(1, -32, 0, 54),
+        Position = UDim2.fromOffset(16, 204),
+        BackgroundTransparency = 1,
+        Text = "Menghubungkan ke Key System...",
+        Font = Enum.Font.Gotham,
+        TextSize = 12,
+        TextWrapped = true,
+        TextColor3 = Color3.fromRGB(190, 180, 205),
+        TextXAlignment = Enum.TextXAlignment.Left,
+        TextYAlignment = Enum.TextYAlignment.Top
+    }, card)
+
+    local remoteFolder = ReplicatedStorage:WaitForChild("AlettaCreatorRemotes", 15)
+    local verifyRemote = remoteFolder and remoteFolder:FindFirstChild("VerifyKey")
+    if not verifyRemote or not verifyRemote:IsA("RemoteFunction") then
+        status.Text = "ERROR: VerifyKey tidak ditemukan. Pasang AlettaKeyServer di ServerScriptService."
+        verify.Active = false
+        verify.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+        return gate, nil, nil
+    end
+
+    local function verifyKey()
+        if verify:GetAttribute("Busy") then return end
+        local key = tostring(input.Text or ""):gsub("^%s+", ""):gsub("%s+$", "")
+        if key == "" then
+            status.Text = "Masukkan Key terlebih dahulu."
+            return
+        end
+
+        verify:SetAttribute("Busy", true)
+        verify.Text = "CHECKING..."
+        verify.Active = false
+        status.Text = "Memeriksa Key, UserId dan device binding..."
+
+        local ok, result = pcall(function()
+            return verifyRemote:InvokeServer({
+                key = key,
+                hwid = getClientIdentifier()
+            })
+        end)
+
+        if ok and type(result) == "table" and result.success then
+            AlettaKeyInfo.valid = true
+            AlettaKeyInfo.type = tostring(result.type or "UNKNOWN")
+            AlettaKeyInfo.expiresAt = result.expiresAt
+            AlettaKeyInfo.key = key
+            status.Text = "KEY VALID\n" ..
+                "Type: " .. AlettaKeyInfo.type ..
+                "\nExpired: " .. formatExpiry(AlettaKeyInfo.expiresAt)
+            task.wait(0.55)
+            gate:Destroy()
+            return true
+        end
+
+        local err = type(result) == "table" and tostring(result.error or "VERIFY_FAILED") or "VERIFY_FAILED"
+        status.Text = "Key ditolak: " .. err
+        verify.Text = "VERIFY KEY"
+        verify.Active = true
+        verify:SetAttribute("Busy", false)
+        return false
+    end
+
+    verify.Activated:Connect(verifyKey)
+    input.FocusLost:Connect(function(enterPressed)
+        if enterPressed then verifyKey() end
+    end)
+
+    return gate, verifyKey, status
+end
+
+local keyGate, verifyKeyNow = makeKeyGate()
+if not verifyKeyNow then
+    warn("[Aletta Creator V15] Key bridge belum tersedia.")
+    return
+end
+
+-- Verifikasi pertama wajib berhasil sebelum GUI utama dibuat.
+local verified = false
+while not verified and keyGate and keyGate.Parent do
+    task.wait(0.25)
+    -- User menekan tombol Verify; gate sendiri menutup setelah berhasil.
+    if AlettaKeyInfo.valid then
+        verified = true
+    end
+end
+if not verified then
     return
 end
 
@@ -94,6 +332,13 @@ Values["Show FOV Circle"] = true
 Values["FOV Radius (pixels)"] = 120
 Values["Predict Killer"] = false
 Values["Moonwalk Held"] = false
+Values["Hold RMB to Aim"] = true
+Values["Show FOV Circle"] = true
+Values["Pistol Show FOV"] = true
+Values["Pistol FOV Radius"] = 120
+Values["Veil Show FOV"] = true
+Values["Show Mobile Target Shortcut"] = false
+Values["Block Aim Knocked"] = true
 
 local Hooks = {}
 local Defaults = {}
@@ -429,7 +674,7 @@ local CONFIG = {
                 T("Show Aim Line (3D)"),
                 I("FOV Radius (pixels)", 120)
             }},
-            {name = "Silent Flask (The Cure)", locked = true, controls = {
+            {name = "Silent Flask (The Cure)", controls = {
                 T("Silent Flask (The Cure)")
             }},
             {name = "Auto Aim Flashlight", controls = {
@@ -499,7 +744,7 @@ local CONFIG = {
             }},
             {name = "Movement", controls = {
                 T("Noclip"),
-                T("Hit Radius"),
+                S("Hit Radius Visual", 0, 32, 8),
                 S("Fly Speed", 0, 600, 100)
             }},
             {name = "Visual Enchancements", controls = {
@@ -573,7 +818,9 @@ local CONFIG = {
                 B("Delete Config"),
                 B("Refresh List"),
                 B("Set as Autoload"),
-                B("Reset Autoload")
+                B("Reset Autoload"),
+                T("Auto Save Config", true),
+                B("Save Config Now")
             }}
         }
     },
@@ -594,8 +841,8 @@ local CONFIG = {
             {name = "Profil User", controls = {
                 {type = "profile", label = "User Profile"},
                 {type = "label", label = "Username  •  " .. player.Name, height = 26},
-                {type = "label", label = "Status  •  FREE", height = 26},
-                {type = "label", label = "Expired  •  Tidak tersedia / tidak ditentukan", height = 32}
+                {type = "label", label = "Status  •  " .. tostring(AlettaKeyInfo.type), height = 26},
+                {type = "label", label = "Expired  •  " .. formatExpiry(AlettaKeyInfo.expiresAt), height = 32}
             }},
             {name = "Sosial Media", controls = {
                 {type = "label", label = "Discord  •  discord.gg/JGNVEK6s7", height = 30},
@@ -1642,43 +1889,64 @@ draggable(icon, icon)
 
 
 -- =========================================================
--- RAIMBOW THEME ANIMATION
+-- RAIMBOW THEME ANIMATION - FULL GUI
 -- =========================================================
+local function paintRainbowTheme()
+    local hue = (os.clock() * 0.10) % 1
+    local main = Color3.fromHSV(hue, 0.72, 0.72)
+    local accent = Color3.fromHSV((hue + 0.16) % 1, 0.88, 1)
+    local outline = Color3.fromHSV((hue + 0.50) % 1, 0.45, 1)
+    local field = main:Lerp(Color3.new(0,0,0), 0.48)
+    local panel = main:Lerp(Color3.new(0,0,0), 0.66)
+
+    ACCENT = accent
+    PANEL = panel
+    FIELD = field
+
+    if window and window.Parent then
+        -- Keep the Rainbow asset as the background; only the GUI colors animate.
+        if bgImg then bgImg.Image = "rbxassetid://89672943739008" end
+        if bgDark then bgDark.BackgroundColor3 = panel end
+        window.BackgroundColor3 = Color3.new(0,0,0)
+    end
+
+    for _, obj in ipairs(window:GetDescendants()) do
+        if obj:IsA("UIStroke") then
+            obj.Color = outline
+        elseif obj:IsA("UIGradient") and obj.Parent and obj.Parent:IsA("UIStroke") then
+            obj.Color = ColorSequence.new({
+                ColorSequenceKeypoint.new(0, Color3.fromHSV(hue,0.90,1)),
+                ColorSequenceKeypoint.new(0.5, Color3.fromHSV((hue+0.33)%1,0.90,1)),
+                ColorSequenceKeypoint.new(1, Color3.fromHSV((hue+0.66)%1,0.90,1))
+            })
+        elseif obj:IsA("TextLabel") or obj:IsA("TextButton") or obj:IsA("TextBox") then
+            obj.TextColor3 = Color3.fromRGB(255,255,255)
+        elseif obj:IsA("TextButton") or obj:IsA("ImageButton") then
+            obj.BackgroundColor3 = field
+        elseif obj:IsA("ScrollingFrame") then
+            obj.BackgroundColor3 = panel
+        elseif obj:IsA("Frame") and obj.BackgroundTransparency < 1 then
+            local n = string.lower(obj.Name or "")
+            local isBg = obj == bgImg or obj == bgDark or obj == headerBar or obj == headerBarShade
+            if not isBg then
+                if n:find("header") or n:find("top") then
+                    obj.BackgroundColor3 = panel
+                else
+                    obj.BackgroundColor3 = field
+                end
+            end
+        end
+    end
+
+    if wStroke then wStroke.Color = outline end
+    if headerStroke then headerStroke.Color = outline end
+    if iconStroke then iconStroke.Color = outline end
+end
+
 task.spawn(function()
     while gui and gui.Parent do
         if Values["Theme List"] == "RAIMBOW" then
-            local hue = (os.clock() * 0.08) % 1
-            local rainbowAccent = Color3.fromHSV(hue, 0.85, 1)
-            ACCENT = rainbowAccent
-
-            if wStroke then
-                wStroke.Color = rainbowAccent
-            end
-            if iconStroke then
-                iconStroke.Color = rainbowAccent
-            end
-            if wGradient then
-                wGradient.Color = ColorSequence.new({
-                    ColorSequenceKeypoint.new(0, Color3.fromHSV((hue + 0.00) % 1, 0.85, 1)),
-                    ColorSequenceKeypoint.new(0.5, Color3.fromHSV((hue + 0.33) % 1, 0.85, 1)),
-                    ColorSequenceKeypoint.new(1, Color3.fromHSV((hue + 0.66) % 1, 0.85, 1))
-                })
-            end
-            if iconGradient then
-                iconGradient.Color = ColorSequence.new({
-                    ColorSequenceKeypoint.new(0, Color3.fromHSV((hue + 0.00) % 1, 0.85, 1)),
-                    ColorSequenceKeypoint.new(0.5, Color3.fromHSV((hue + 0.33) % 1, 0.85, 1)),
-                    ColorSequenceKeypoint.new(1, Color3.fromHSV((hue + 0.66) % 1, 0.85, 1))
-                })
-            end
-
-            for _, obj in ipairs(window:GetDescendants()) do
-                if obj:IsA("TextLabel") or obj:IsA("TextButton") then
-                    if obj.Name == "AlettaCreatorTitle" then
-                        obj.TextColor3 = rainbowAccent
-                    end
-                end
-            end
+            pcall(paintRainbowTheme)
         end
         task.wait(0.08)
     end
@@ -2289,26 +2557,31 @@ Hooks["Crosshair Y Offset"] = function()
 end
 
 -- =========================================================
--- LOCAL AIM TARGET TEST
+-- ALETTA AIM SYSTEM V13 - LOCAL / VERIFIED TARGETING HOOKS
+-- Uses the existing game/player structure and never invents server payloads.
 -- =========================================================
 
-local AimLock = {
-    target = nil
-}
-
+local AimLock = {target=nil, player=nil, position=nil, score=math.huge}
 _G.AlettaAimLock = AimLock
+
+local aimFovGui, aimFovCircle, pistolFovCircle, veilFovCircle
+local aimLinePart, aimLineAttachment, aimLineTargetPart, aimLineTargetAttachment, aimLineBeam
+local laserPart, laserAttachment, laserTargetPart, laserTargetAttachment, laserBeam
+local targetRing
+local mobileAimButton
+local rmbHeld = false
+local mobileAimHeld = false
+local lastTOF = 0
 
 local function aimPartFor(characterModel)
     local targetMode = Values["Target Aim"] or "Torso"
-
     if targetMode == "Head" then
-        return characterModel:FindFirstChild("Head")
-            or characterModel:FindFirstChild("HumanoidRootPart")
+        return characterModel:FindFirstChild("Head") or characterModel:FindFirstChild("HumanoidRootPart")
     elseif targetMode == "Legs" then
         return characterModel:FindFirstChild("LeftFoot")
+            or characterModel:FindFirstChild("LeftLowerLeg")
             or characterModel:FindFirstChild("HumanoidRootPart")
     end
-
     return characterModel:FindFirstChild("UpperTorso")
         or characterModel:FindFirstChild("Torso")
         or characterModel:FindFirstChild("HumanoidRootPart")
@@ -2318,35 +2591,48 @@ local function hasLineOfSight(origin, part, targetCharacter)
     local params = RaycastParams.new()
     params.FilterType = Enum.RaycastFilterType.Exclude
     params.FilterDescendantsInstances = {character(), targetCharacter}
-
-    local result = workspace:Raycast(
-        origin,
-        part.Position - origin,
-        params
-    )
-
+    local result = workspace:Raycast(origin, part.Position - origin, params)
     return result == nil
+end
+
+local function isKnocked(targetCharacter, targetPlayer)
+    if Values["Block Aim Knocked"] ~= true then return false end
+    local names = {"Knocked", "Downed", "IsKnocked", "DBNO", "InjuredDown", "Unconscious"}
+    for _, n in ipairs(names) do
+        local a = targetCharacter and targetCharacter:GetAttribute(n)
+        local b = targetPlayer and targetPlayer:GetAttribute(n)
+        if a == true or b == true then return true end
+        if tostring(a):lower() == "knocked" or tostring(b):lower() == "knocked" then return true end
+    end
+    local h = targetCharacter and targetCharacter:FindFirstChildOfClass("Humanoid")
+    if h then
+        local st = tostring(h:GetState())
+        if st:find("PlatformStanding") or st:find("Physics") then
+            -- Do not treat every physics state as knocked; only reject if an explicit marker exists.
+        end
+    end
+    return false
 end
 
 local function detectAimRole(targetPlayer)
     if not targetPlayer then return nil end
-    local c=targetPlayer.Character
+    local c = targetPlayer.Character
     local function norm(v)
-        if v==nil then return nil end
-        local t=tostring(v):lower():gsub("%s+","")
+        if v == nil then return nil end
+        local t = tostring(v):lower():gsub("%s+", "")
         if t:find("killer",1,true) then return "Killer" end
         if t:find("survivor",1,true) then return "Survivor" end
         if t:find("zombie",1,true) then return "Zombie" end
         if t:find("scp",1,true) then return "SCP" end
         return nil
     end
-    local candidates={
+    local candidates = {
         c and c:GetAttribute("Role"), c and c:GetAttribute("RoleName"), c and c:GetAttribute("Team"),
         targetPlayer:GetAttribute("Role"), targetPlayer:GetAttribute("RoleName"), targetPlayer:GetAttribute("Team"),
         targetPlayer.Team and targetPlayer.Team.Name
     }
-    for _,v in ipairs(candidates) do
-        local r=norm(v)
+    for _, v in ipairs(candidates) do
+        local r = norm(v)
         if r then return r end
     end
     return nil
@@ -2354,72 +2640,37 @@ end
 
 local function getAimTarget()
     camera = workspace.CurrentCamera or camera
-    if not camera then return nil end
-
     local myRoot = root()
-    if not myRoot then return nil end
+    if not camera or not myRoot then return nil end
 
-    local maxPixels = tonumber(Values["Pistol FOV Radius"]) or 120
-    local maxWorldDistance = 80
+    local maxPixels = math.clamp(tonumber(Values["Pistol FOV Radius"]) or 120, 10, 600)
+    if Values["Pistol FOV Mode"] ~= true and Values["Enable Aimbot"] ~= true then
+        maxPixels = math.max(maxPixels, 120)
+    end
+    local maxWorldDistance = 500
     local targetMode = Values["Pistol Target"] or "Killer"
-
-    local bestPart
-    local bestScore = math.huge
+    local bestPart, bestPlayer, bestScore = nil, nil, math.huge
+    local center = Vector2.new(camera.ViewportSize.X/2, camera.ViewportSize.Y/2)
 
     for _, targetPlayer in ipairs(Players:GetPlayers()) do
         if targetPlayer ~= player then
-            local targetCharacter = targetPlayer.Character
-            local targetHumanoid = targetCharacter
-                and targetCharacter:FindFirstChildOfClass("Humanoid")
-            local targetRoot = targetCharacter
-                and targetCharacter:FindFirstChild("HumanoidRootPart")
-
-            if targetCharacter and targetHumanoid and targetRoot
-                and targetHumanoid.Health > 0 then
-
-                -- Gunakan detector role yang sama dengan ESP: Role/RoleName/Team
-                -- sehingga target tetap ditemukan walau game tidak memakai Attribute("Role").
-                local detectedRole = detectAimRole(targetPlayer)
-                local validRole = true
-
-                if targetMode == "Killer" then
-                    validRole = detectedRole == "Killer"
-                elseif targetMode == "Survivor" then
-                    validRole = detectedRole == "Survivor"
-                elseif targetMode == "Zombie" then
-                    validRole = detectedRole == "Zombie" or detectedRole == "SCP"
-                end
-
+            local tc = targetPlayer.Character
+            local th = tc and tc:FindFirstChildOfClass("Humanoid")
+            local tr = tc and tc:FindFirstChild("HumanoidRootPart")
+            if tc and th and tr and th.Health > 0 and not isKnocked(tc, targetPlayer) then
+                local role = detectAimRole(targetPlayer)
+                local validRole = (targetMode == "Killer" and role == "Killer")
+                    or (targetMode == "Survivor" and role == "Survivor")
+                    or (targetMode == "Zombie" and (role == "Zombie" or role == "SCP"))
                 if validRole then
-                    local part = aimPartFor(targetCharacter)
-
+                    local part = aimPartFor(tc)
                     if part then
-                        local worldDistance =
-                            (targetRoot.Position - myRoot.Position).Magnitude
-
-                        local screen, onScreen =
-                            camera:WorldToViewportPoint(part.Position)
-
-                        if onScreen and worldDistance <= maxWorldDistance then
-                            local center =
-                                Vector2.new(
-                                    camera.ViewportSize.X / 2,
-                                    camera.ViewportSize.Y / 2
-                                )
-
-                            local score =
-                                (Vector2.new(screen.X, screen.Y) - center).Magnitude
-
-                            if score <= maxPixels
-                                and score < bestScore
-                                and hasLineOfSight(
-                                    camera.CFrame.Position,
-                                    part,
-                                    targetCharacter
-                                ) then
-
-                                bestScore = score
-                                bestPart = part
+                        local distance = (tr.Position - myRoot.Position).Magnitude
+                        local screen, onScreen = camera:WorldToViewportPoint(part.Position)
+                        if onScreen and screen.Z > 0 and distance <= maxWorldDistance then
+                            local score = (Vector2.new(screen.X,screen.Y)-center).Magnitude
+                            if score <= maxPixels and score < bestScore and hasLineOfSight(camera.CFrame.Position,part,tc) then
+                                bestPart, bestPlayer, bestScore = part, targetPlayer, score
                             end
                         end
                     end
@@ -2427,143 +2678,271 @@ local function getAimTarget()
             end
         end
     end
-
-    return bestPart
+    return bestPart, bestPlayer, bestScore
 end
 
-Hooks["Aim Lock"] = function(on)
-    if on then
-        FeatureManager:Connect("Aim Lock", RunService.RenderStepped, function()
-            AimLock.target = getAimTarget()
-        end)
-    else
-        AimLock.target = nil
+local function predictedPosition(part, smart, leadOverride)
+    if not part then return nil end
+    local velocity = part.AssemblyLinearVelocity or Vector3.zero
+    local lead = leadOverride
+    if lead == nil then
+        lead = math.clamp((tonumber(Values["Prediction"]) or 35) / 100, 0, 1.5)
     end
+    if smart then
+        local rootPart = part.Parent and part.Parent:FindFirstChild("HumanoidRootPart")
+        local origin = rootPart and rootPart.Position or (camera and camera.CFrame.Position) or part.Position
+        local speed = math.max((camera and (part.Position-origin).Magnitude or 0) / math.max(lead,0.05), 1)
+        lead = math.clamp((part.Position-origin).Magnitude / speed * (tonumber(Values["Smart Predict Lead"]) or 17) / 100, 0, 1.5)
+    end
+    return part.Position + velocity * lead
+end
+
+local function refreshAimLock()
+    local part, plr, score = getAimTarget()
+    AimLock.target, AimLock.player, AimLock.score = part, plr, score or math.huge
+    AimLock.position = part and predictedPosition(part, false) or nil
+    return part, plr
 end
 
 function AimLock.GetTarget()
     local target = AimLock.target
-
     if target and target.Parent then
         local h = target.Parent:FindFirstChildOfClass("Humanoid")
-        if h and h.Health > 0 then
-            return target
-        end
+        if h and h.Health > 0 and not isKnocked(target.Parent, AimLock.player) then return target end
     end
-
     return nil
 end
+function AimLock.Clear() AimLock.target=nil AimLock.player=nil AimLock.position=nil end
 
-function AimLock.Clear()
-    AimLock.target = nil
+local function destroyAimVisuals()
+    if aimFovGui then pcall(function() aimFovGui:Destroy() end) end
+    aimFovGui, aimFovCircle, pistolFovCircle, veilFovCircle = nil,nil,nil,nil
+    if targetRing then pcall(function() targetRing:Destroy() end) end
+    targetRing=nil
 end
 
--- =========================================================
--- AIM FOV CIRCLE + PREDICTIVE AIM
--- =========================================================
-local aimFovGui, aimFovCircle, aimLine
-
-local function destroyAimFov()
-    if aimFovGui then aimFovGui:Destroy() end
-    aimFovGui, aimFovCircle, aimLine = nil, nil, nil
+local function makeCircle(parent,name)
+    local f=Instance.new("Frame")
+    f.Name=name; f.AnchorPoint=Vector2.new(.5,.5); f.BackgroundTransparency=1
+    f.Position=UDim2.fromScale(.5,.5); f.Parent=parent
+    local st=Instance.new("UIStroke"); st.Color=ACCENT; st.Thickness=2; st.Parent=f
+    local cr=Instance.new("UICorner"); cr.CornerRadius=UDim.new(1,0); cr.Parent=f
+    return f
 end
 
 local function updateAimFov()
-    local pistolCircle = Values["Pistol"] and Values["Pistol Show FOV"] ~= false
-    local aimCircle = Values["Enable Aimbot"] and Values["Show FOV Circle"]
-    if not pistolCircle and not aimCircle then
-        destroyAimFov()
+    local need = Values["Show FOV Circle"] or Values["Pistol Show FOV"] or Values["Veil Show FOV"]
+    if not need then destroyAimVisuals(); return end
+    if not aimFovGui or not aimFovGui.Parent then
+        aimFovGui=Instance.new("ScreenGui"); aimFovGui.Name="AlettaAimFOV"; aimFovGui.IgnoreGuiInset=true; aimFovGui.ResetOnSpawn=false; aimFovGui.Parent=playerGui
+    end
+    if Values["Show FOV Circle"] and not aimFovCircle then aimFovCircle=makeCircle(aimFovGui,"AimbotFOV") end
+    if not Values["Show FOV Circle"] and aimFovCircle then aimFovCircle:Destroy(); aimFovCircle=nil end
+    if Values["Pistol Show FOV"] and not pistolFovCircle then pistolFovCircle=makeCircle(aimFovGui,"PistolFOV") end
+    if not Values["Pistol Show FOV"] and pistolFovCircle then pistolFovCircle:Destroy(); pistolFovCircle=nil end
+    if Values["Veil Show FOV"] and not veilFovCircle then veilFovCircle=makeCircle(aimFovGui,"VeilFOV") end
+    if not Values["Veil Show FOV"] and veilFovCircle then veilFovCircle:Destroy(); veilFovCircle=nil end
+    local ar=math.clamp(tonumber(Values["FOV Radius (pixels)"]) or 120,10,600)
+    local pr=math.clamp(tonumber(Values["Pistol FOV Radius"]) or 120,10,600)
+    local vr=math.clamp(tonumber(Values["Veil FOV Radius"]) or 120,10,600)
+    if aimFovCircle then aimFovCircle.Size=UDim2.fromOffset(ar*2,ar*2) end
+    if pistolFovCircle then pistolFovCircle.Size=UDim2.fromOffset(pr*2,pr*2) end
+    if veilFovCircle then veilFovCircle.Size=UDim2.fromOffset(vr*2,vr*2) end
+end
+
+local function destroyBeam(kind)
+    if kind=="aim" then
+        if aimLineBeam then pcall(function() aimLineBeam:Destroy() end) end
+        if aimLinePart then pcall(function() aimLinePart:Destroy() end) end
+        if aimLineTargetPart then pcall(function() aimLineTargetPart:Destroy() end) end
+        aimLineBeam,aimLinePart,aimLineTargetPart=nil,nil,nil
+    else
+        if laserBeam then pcall(function() laserBeam:Destroy() end) end
+        if laserPart then pcall(function() laserPart:Destroy() end) end
+        if laserTargetPart then pcall(function() laserTargetPart:Destroy() end) end
+        laserBeam,laserPart,laserTargetPart=nil,nil,nil
+    end
+end
+
+local function makeBeam(kind)
+    local isAim=kind=="aim"
+    local beam=isAim and aimLineBeam or laserBeam
+    if beam and beam.Parent then return beam end
+    local a=Instance.new("Part"); a.Name=isAim and "AlettaAimOrigin" or "AlettaLaserOrigin"; a.Anchored=true; a.CanCollide=false; a.CanTouch=false; a.CanQuery=false; a.Transparency=1; a.Size=Vector3.new(.1,.1,.1); a.Parent=workspace
+    local b=Instance.new("Part"); b.Name=isAim and "AlettaAimTarget" or "AlettaLaserTarget"; b.Anchored=true; b.CanCollide=false; b.CanTouch=false; b.CanQuery=false; b.Transparency=1; b.Size=Vector3.new(.1,.1,.1); b.Parent=workspace
+    local aa=Instance.new("Attachment"); aa.Parent=a
+    local ab=Instance.new("Attachment"); ab.Parent=b
+    local bm=Instance.new("Beam"); bm.Attachment0=aa; bm.Attachment1=ab; bm.FaceCamera=true; bm.Width0=.035; bm.Width1=.035; bm.LightEmission=1; bm.Color=ColorSequence.new(ACCENT); bm.Transparency=NumberSequence.new(.1); bm.Parent=a
+    if isAim then aimLinePart,aimLineAttachment,aimLineTargetPart,aimLineTargetAttachment,aimLineBeam=a,aa,b,ab,bm else laserPart,laserAttachment,laserTargetPart,laserTargetAttachment,laserBeam=a,aa,b,ab,bm end
+    return bm
+end
+
+local function update3DVisuals(part)
+    if not part then
+        if not Values["Show Aim Line (3D)"] then destroyBeam("aim") end
+        if not Values["Show Laser"] then destroyBeam("laser") end
+        if targetRing then targetRing.Enabled=false end
         return
     end
-    if not aimFovGui then
-        aimFovGui = Instance.new("ScreenGui")
-        aimFovGui.Name = "AlettaAimFOV"
-        aimFovGui.IgnoreGuiInset = true
-        aimFovGui.ResetOnSpawn = false
-        aimFovGui.Parent = playerGui
-        aimFovCircle = Instance.new("Frame")
-        aimFovCircle.AnchorPoint = Vector2.new(.5,.5)
-        aimFovCircle.BackgroundTransparency = 1
-        aimFovCircle.Position = UDim2.fromScale(.5,.5)
-        aimFovCircle.Parent = aimFovGui
-        local st=Instance.new("UIStroke"); st.Color=ACCENT; st.Thickness=2; st.Transparency=.05; st.Parent=aimFovCircle
-        local cr=Instance.new("UICorner"); cr.CornerRadius=UDim.new(1,0); cr.Parent=aimFovCircle
+    local pos=predictedPosition(part,Values["Smart Predict Mode"] and Values["Veil"])
+    camera=workspace.CurrentCamera or camera
+    if not camera or not pos then return end
+    if Values["Show Aim Line (3D)"] then
+        makeBeam("aim"); aimLinePart.CFrame=CFrame.new(camera.CFrame.Position); aimLineTargetPart.CFrame=CFrame.new(pos)
+    else destroyBeam("aim") end
+    if Values["Pistol"] and Values["Show Laser"] then
+        makeBeam("laser"); laserPart.CFrame=CFrame.new(camera.CFrame.Position); laserTargetPart.CFrame=CFrame.new(pos)
+    else destroyBeam("laser") end
+end
+
+local function updateTargetRing(part)
+    if not Values["Tampilkan Jarak Senter (Ring)"] or not part then
+        if targetRing then targetRing.Enabled=false end
+        return
     end
-    local r=math.clamp(tonumber(Values["FOV Radius (pixels)"]) or 120,10,600)
-    aimFovCircle.Size=UDim2.fromOffset(r*2,r*2)
-end
-
-Hooks["Show FOV Circle"] = function(on)
-    Values["Show FOV Circle"] = on == true
-    updateAimFov()
-end
-Hooks["FOV Radius (pixels)"] = function(v)
-    Values["FOV Radius (pixels)"] = math.clamp(tonumber(v) or 120,10,600)
-    updateAimFov()
-end
-Hooks["Pistol Show FOV"] = function(on)
-    Values["Pistol Show FOV"] = on == true
-    updateAimFov()
-end
-Hooks["Pistol FOV Radius"] = function(v)
-    Values["Pistol FOV Radius"] = math.clamp(tonumber(v) or 120,10,600)
-    if Values["Pistol Show FOV"] then updateAimFov() end
-end
-
-local function predictedPosition(part)
-    if not part then return nil end
-    local v = part.AssemblyLinearVelocity or Vector3.zero
-    -- Slider 35 = 0.35 detik lead, bukan 35 studs.
-    local p = math.clamp((tonumber(Values["Prediction"]) or 35) / 100, 0, 1.5)
-    return part.Position + v * p
-end
-
-local function aimAtPredictedTarget(part)
-    if not part then return end
-    local pos = predictedPosition(part)
-    if not pos then return end
-    camera = workspace.CurrentCamera or camera
-    if camera then
-        camera.CFrame = CFrame.lookAt(camera.CFrame.Position, pos)
+    if not targetRing then
+        targetRing=Instance.new("CylinderHandleAdornment"); targetRing.Name="AlettaFlashlightRangeRing"; targetRing.Color3=ACCENT; targetRing.Transparency=.45; targetRing.AlwaysOnTop=true; targetRing.Height=.12; targetRing.Radius=5; targetRing.Adornee=part; targetRing.Parent=part
     end
+    targetRing.Adornee=part; targetRing.Radius=5; targetRing.Enabled=true
+end
+
+local function playTOF(part)
+    if not Values["Sound TOF"] or not part or os.clock()-lastTOF<.12 then return end
+    lastTOF=os.clock()
+    local tool=character() and character():FindFirstChildOfClass("Tool")
+    local sound=tool and tool:FindFirstChildWhichIsA("Sound",true)
+    if sound then pcall(function() sound:Play() end) end
+end
+
+local function updateMobileAimButton()
+    if not Values["Show Mobile Target Shortcut"] then
+        if mobileAimButton then mobileAimButton.Visible=false end
+        return
+    end
+    if not mobileAimButton then
+        mobileAimButton=Instance.new("TextButton")
+        mobileAimButton.Name="AlettaMobileTargetShortcut"; mobileAimButton.Size=UDim2.fromOffset(150,42); mobileAimButton.Position=UDim2.new(1,-165,1,-70)
+        mobileAimButton.BackgroundColor3=PANEL; mobileAimButton.TextColor3=TEXT; mobileAimButton.Text="TARGET AIM: OFF"; mobileAimButton.TextSize=14; mobileAimButton.AutoButtonColor=true; mobileAimButton.Parent=playerGui
+        local c=Instance.new("UICorner"); c.CornerRadius=UDim.new(0,10); c.Parent=mobileAimButton
+        local s=Instance.new("UIStroke"); s.Color=ACCENT; s.Parent=mobileAimButton
+        mobileAimButton.Activated:Connect(function()
+            mobileAimHeld=not mobileAimHeld
+            mobileAimButton.Text=mobileAimHeld and "TARGET AIM: ON" or "TARGET AIM: OFF"
+        end)
+    end
+    mobileAimButton.Visible=true
 end
 
 Hooks["Enable Aimbot"] = function(on)
-    disconnectList("Aimbot Predict")
+    disconnectList("Aimbot Runtime")
     updateAimFov()
     if not on then return end
-    FeatureManager:Connect("Aimbot Predict", RunService.RenderStepped, function()
-        local target = getAimTarget()
-        if target then aimAtPredictedTarget(target) end
+    FeatureManager:Connect("Aimbot Runtime",RunService.RenderStepped,function()
+        if Values["Hold RMB to Aim"] and not rmbHeld and not mobileAimHeld then return end
+        local part=refreshAimLock()
+        if part then
+            local pos=predictedPosition(part,false)
+            if pos and camera then camera.CFrame=CFrame.lookAt(camera.CFrame.Position,pos) end
+            update3DVisuals(part); updateTargetRing(part); playTOF(part)
+        end
     end)
 end
 
-local function runPistolAim()
-    local target = getAimTarget()
-    if not target then return end
-    aimAtPredictedTarget(target)
+Hooks["Hold RMB to Aim"] = function(on)
+    Values["Hold RMB to Aim"]=on==true
 end
+Hooks["Show FOV Circle"] = function(on) Values["Show FOV Circle"]=on==true; updateAimFov() end
+Hooks["FOV Radius (pixels)"] = function(v) Values["FOV Radius (pixels)"]=math.clamp(tonumber(v) or 120,10,600); updateAimFov() end
+Hooks["Pistol Show FOV"] = function(on) Values["Pistol Show FOV"]=on==true; updateAimFov() end
+Hooks["Pistol FOV Radius"] = function(v) Values["Pistol FOV Radius"]=math.clamp(tonumber(v) or 120,10,600); updateAimFov() end
+Hooks["Tampilkan Jarak Senter (Ring)"] = function() end
+Hooks["Show Aim Line (3D)"] = function(on) if not on then destroyBeam("aim") end end
+Hooks["Show Laser"] = function(on) if not on then destroyBeam("laser") end end
+Hooks["Pistol FOV Mode"] = function() updateAimFov() end
+Hooks["Pistol Target"] = function() end
+Hooks["Block Aim Knocked"] = function() end
+Hooks["Prediction"] = function(v) Values["Prediction"]=math.clamp(tonumber(v) or 35,0,150) end
 
 Hooks["Pistol"] = function(on)
-    disconnectList("Pistol Predict")
-    updateAimFov()
-    if not on then return end
-    FeatureManager:Connect("Pistol Predict", RunService.RenderStepped, function()
-        runPistolAim()
+    disconnectList("Pistol Runtime")
+    updateAimFov(); updateMobileAimButton()
+    if not on then destroyBeam("laser"); return end
+    FeatureManager:Connect("Pistol Runtime",RunService.RenderStepped,function()
+        local part=refreshAimLock()
+        if part then
+            local pos=predictedPosition(part,false)
+            if pos and camera then camera.CFrame=CFrame.lookAt(camera.CFrame.Position,pos) end
+            update3DVisuals(part); updateTargetRing(part); playTOF(part)
+        end
     end)
+end
+
+Hooks["Aim Lock"] = function(on)
+    disconnectList("Aim Lock Runtime")
+    if not on then AimLock.Clear(); return end
+    FeatureManager:Connect("Aim Lock Runtime",RunService.RenderStepped,function() refreshAimLock() end)
 end
 
 Hooks["Auto Prediksi"] = function(on)
-    disconnectList("Auto Prediksi Aim")
+    disconnectList("Auto Prediksi Runtime")
     if not on then return end
-    FeatureManager:Connect("Auto Prediksi Aim", RunService.RenderStepped, function()
-        runPistolAim()
+    FeatureManager:Connect("Auto Prediksi Runtime",RunService.RenderStepped,function()
+        local part=refreshAimLock()
+        if part and camera then
+            local pos=predictedPosition(part,false)
+            if pos then camera.CFrame=CFrame.lookAt(camera.CFrame.Position,pos) end
+        end
     end)
 end
 
-Hooks["Pistol FOV Mode"] = function() updateAimFov() end
-Hooks["Pistol Target"] = function() end
-Hooks["Prediction"] = function(v) Values["Prediction"] = math.clamp(tonumber(v) or 35,0,150) end
+Hooks["Auto Aim Senter ke Killer"] = function(on)
+    disconnectList("Flashlight Aim")
+    if not on then return end
+    FeatureManager:Connect("Flashlight Aim",RunService.RenderStepped,function()
+        local old=Values["Pistol Target"]; Values["Pistol Target"]="Killer"
+        local part=refreshAimLock()
+        Values["Pistol Target"]=old
+        if part and camera then
+            local pos=predictedPosition(part,false)
+            if pos then camera.CFrame=CFrame.lookAt(camera.CFrame.Position,pos) end
+            updateTargetRing(part); playTOF(part)
+        end
+    end)
+end
+
+Hooks["Silent Flask (The Cure)"] = function(on)
+    disconnectList("Silent Flask")
+    if not on then return end
+    FeatureManager:Connect("Silent Flask",RunService.RenderStepped,function()
+        local tool=character() and character():FindFirstChildOfClass("Tool")
+        if not tool then return end
+        local n=tool.Name:lower()
+        if not (n:find("cure",1,true) or n:find("flash",1,true) or n:find("flask",1,true)) then return end
+        for _,d in ipairs(tool:GetDescendants()) do
+            if d:IsA("Sound") then d.Volume=0 end
+        end
+        local old=Values["Pistol Target"]; Values["Pistol Target"]="Killer"
+        local part=refreshAimLock(); Values["Pistol Target"]=old
+        if part and camera then camera.CFrame=CFrame.lookAt(camera.CFrame.Position,part.Position) end
+    end)
+end
+
+Hooks["Show Mobile Target Shortcut"] = function() updateMobileAimButton() end
+
+UIS.InputBegan:Connect(function(input,processed)
+    if processed then return end
+    if input.UserInputType==Enum.UserInputType.MouseButton2 then rmbHeld=true end
+    if input.UserInputType==Enum.UserInputType.Keyboard and input.KeyCode==(Values["Mobile Target Shortcut Key"] or Enum.KeyCode.T) then
+        if Values["Show Mobile Target Shortcut"] then mobileAimHeld=not mobileAimHeld end
+    end
+end)
+UIS.InputEnded:Connect(function(input)
+    if input.UserInputType==Enum.UserInputType.MouseButton2 then rmbHeld=false end
+end)
+
+-- =========================================================
+-- END AIM SYSTEM
+-- =========================================================
 
 -- =========================================================
 -- KILLER PREDICTION PANEL
@@ -2963,128 +3342,130 @@ Hooks["Theme List"] = function(theme)
     applyConfigVisuals()
 end
 
-local function configSnapshot()
-    local snapshot = {}
-    for key, value in pairs(Values) do
-        if typeof(value) == "EnumItem" then
-            snapshot[key] = value.Name
-        elseif type(value) ~= "table" then
-            snapshot[key] = value
+local CONFIG_FILE = "AlettaCreator_Config.json"
+local function canFileRead() return type(readfile)=="function" and type(isfile)=="function" end
+local function canFileWrite() return type(writefile)=="function" end
+local function encodeValue(v)
+    local tv=typeof(v)
+    if tv=="EnumItem" then return {__enum=tostring(v.EnumType),name=v.Name}
+    if tv=="Color3" then return {__color3=true,r=v.R,g=v.B,b=v.B} end
+    if type(v)=="table" then
+        local t={}
+        for k,x in pairs(v) do
+            local ex=encodeValue(x)
+            if ex~=nil then t[k]=ex end
         end
+        return t
+    end
+    if type(v)=="string" or type(v)=="number" or type(v)=="boolean" then return v end
+    return nil
+end
+local function decodeValue(v)
+    if type(v)~="table" then return v end
+    if v.__color3 then return Color3.new(tonumber(v.r) or 0,tonumber(v.g) or 0,tonumber(v.b) or 0) end
+    if v.__enum then
+        local et=v.__enum:gsub("Enum%.?","")
+        local ok,en=pcall(function() return Enum[et] end)
+        if ok and en and en[v.name] then return en[v.name] end
+        return v.name
+    end
+    local t={}; for k,x in pairs(v) do t[k]=decodeValue(x) end; return t
+end
+local function configSnapshot()
+    local snapshot={}
+    -- Simpan hanya control yang benar-benar ada di GUI, bukan runtime objects.
+    for key in pairs(Controls) do
+        local v=encodeValue(Values[key])
+        if v~=nil then snapshot[key]=v end
     end
     return snapshot
 end
-
+local function savePersistentConfig(name,snapshot)
+    if not canFileWrite() then return false end
+    local ok,json=pcall(function() return HttpService:JSONEncode({version=2,configs={[name]=snapshot}}) end)
+    if not ok then return false end
+    local old={}
+    if canFileRead() and isfile(CONFIG_FILE) then
+        local rok,r=pcall(readfile,CONFIG_FILE); if rok then local dok,d=pcall(HttpService.JSONDecode,HttpService,r); if dok and type(d)=="table" then old=d end end
+    end
+    old.version=2; old.configs=old.configs or {}; old.configs[name]=snapshot
+    local wok,w=pcall(function() return HttpService:JSONEncode(old) end)
+    if wok then return pcall(writefile,CONFIG_FILE,w) end
+    return false
+end
+local function loadPersistentConfigs()
+    if not (canFileRead() and isfile(CONFIG_FILE)) then return end
+    local ok,data=pcall(readfile,CONFIG_FILE); if not ok then return end
+    local dok,obj=pcall(HttpService.JSONDecode,HttpService,data)
+    if not dok or type(obj)~="table" or type(obj.configs)~="table" then return end
+    for name,snap in pairs(obj.configs) do sessionConfigs[name]=snap end
+end
 local function applySnapshot(snapshot)
-    if type(snapshot) ~= "table" then return end
-    for key, value in pairs(snapshot) do
-        local control = Controls[key]
-        if control and control.set then
-            pcall(function() control.set(value) end)
-        else
-            Values[key] = value
-        end
+    if type(snapshot)~="table" then return end
+    for key, raw in pairs(snapshot) do
+        local value=decodeValue(raw)
+        local control=Controls[key]
+        if control and control.set then pcall(function() control.set(value) end) else Values[key]=value end
     end
     applyConfigVisuals()
 end
-
 local function configNames()
-    local names = {}
-    for name in pairs(sessionConfigs) do table.insert(names, name) end
-    table.sort(names)
-    if #names == 0 then names[1] = "No Config" end
-    return names
+    local names={}; for name in pairs(sessionConfigs) do table.insert(names,name) end
+    table.sort(names); if #names==0 then names[1]="No Config" end; return names
 end
-
 local function refreshConfigDropdown(selected)
-    local list = configNames()
-    local current = selected or Values["Config List"]
-    if not sessionConfigs[current] and current ~= "No Config" then
-        current = list[1]
-    end
-    Values["Config List"] = current
-    local control = Controls["Config List"]
-    if control and control.setOptions then
-        control.setOptions(list, current)
-    elseif control and control.set then
-        control.set(current)
-    end
+    local list=configNames(); local current=selected or Values["Config List"]
+    if not sessionConfigs[current] and current~="No Config" then current=list[1] end
+    Values["Config List"]=current
+    local control=Controls["Config List"]
+    if control and control.setOptions then control.setOptions(list,current) elseif control and control.set then control.set(current) end
     return list
 end
-
 Hooks["Create Config"] = function()
-    local name = tostring(Values["Config Name"] or ""):gsub("^%s+", ""):gsub("%s+$", "")
-    if name == "" then
-        warn("[Aletta] Config Name masih kosong.")
-        return
-    end
-    sessionConfigs[name] = configSnapshot()
-    refreshConfigDropdown(name)
-    print("[Aletta] Config dibuat:", name)
+    local name=tostring(Values["Config Name"] or ""):gsub("^%s+",""):gsub("%s+$","")
+    if name=="" then warn("[Aletta] Config Name masih kosong."); return end
+    local snap=configSnapshot(); sessionConfigs[name]=snap; savePersistentConfig(name,snap); refreshConfigDropdown(name)
 end
-
 Hooks["Load Config"] = function()
-    local name = Values["Config List"]
-    local snapshot = sessionConfigs[name]
-    if snapshot then
-        applySnapshot(snapshot)
-        print("[Aletta] Config dimuat:", name)
-    end
+    local name=Values["Config List"]; local snap=sessionConfigs[name]
+    if snap then applySnapshot(snap); print("[Aletta] Config dimuat:",name) end
 end
-
 Hooks["Overwrite Config"] = function()
-    local name = Values["Config List"]
-    if not sessionConfigs[name] then return end
-    sessionConfigs[name] = configSnapshot()
-    print("[Aletta] Config ditimpa:", name)
+    local name=Values["Config List"]; if not sessionConfigs[name] then return end
+    local snap=configSnapshot(); sessionConfigs[name]=snap; savePersistentConfig(name,snap)
 end
-
 Hooks["Delete Config"] = function()
-    local name = Values["Config List"]
-    if name and sessionConfigs[name] then
-        sessionConfigs[name] = nil
-        refreshConfigDropdown()
-        print("[Aletta] Config dihapus:", name)
-    end
+    local name=Values["Config List"]; if name and sessionConfigs[name] then sessionConfigs[name]=nil; refreshConfigDropdown() end
 end
-
-Hooks["Refresh List"] = function()
-    refreshConfigDropdown()
-end
-
+Hooks["Refresh List"] = function() refreshConfigDropdown() end
 Hooks["Set as Autoload"] = function()
-    local name = Values["Config List"]
-    if sessionConfigs[name] then
-        autoloadConfig = name
-        print("[Aletta] Autoload:", name)
-    end
+    local name=Values["Config List"]; if sessionConfigs[name] then autoloadConfig=name end
 end
-
-Hooks["Reset Autoload"] = function()
-    autoloadConfig = nil
-    print("[Aletta] Autoload di-reset.")
-end
-
+Hooks["Reset Autoload"] = function() autoloadConfig=nil end
 Hooks["Save Config Now"] = function()
-    local name = tostring(Values["Config Name"] or "Session")
-    sessionConfigs[name] = configSnapshot()
-    print("[Aletta] Config snapshot disimpan di sesi:", name)
+    local name=tostring(Values["Config Name"] or "Session"); local snap=configSnapshot(); sessionConfigs[name]=snap; savePersistentConfig(name,snap); refreshConfigDropdown(name); print("[Aletta] Config disimpan:",name)
 end
-
-Hooks["Reset to Default"] = function()
-    for name, default in pairs(Defaults) do
-        local control = Controls[name]
-        if control and control.set then
-            pcall(function() control.set(default) end)
-        else
-            Values[name] = default
-        end
+Hooks["Auto Save Config"] = function(on)
+    Values["Auto Save Config"]=on==true
+    if on then
+        local name=tostring(Values["Config Name"] or "Session"); local snap=configSnapshot(); sessionConfigs[name]=snap; savePersistentConfig(name,snap)
     end
+end
+Hooks["Reset to Default"] = function()
+    for name,default in pairs(Defaults) do local control=Controls[name]; if control and control.set then pcall(function() control.set(default) end) else Values[name]=default end end
     applyConfigVisuals()
 end
-
 Hooks["Delete Config File"] = function()
-    print("[Aletta] Build ini tidak memakai filesystem exploit; gunakan Configuration untuk config sesi.")
+    if type(delfile)=="function" and type(isfile)=="function" and isfile(CONFIG_FILE) then pcall(delfile,CONFIG_FILE) end
+    sessionConfigs={}; refreshConfigDropdown()
+end
+
+loadPersistentConfigs()
+if Values["Auto Save Config"] then
+    task.defer(function()
+        local name=autoloadConfig or Values["Config List"]
+        if name and sessionConfigs[name] then applySnapshot(sessionConfigs[name]) end
+    end)
 end
 
 -- Single Execute / Keep Loaded
@@ -3728,45 +4109,34 @@ end)
 -- =========================================================
 
 -- =========================================================
--- VEIL AUTO AIM + PREDICTION
+-- VEIL AUTO AIM + SMART PREDICTION + FOV / SNAPLINE
 -- =========================================================
--- Target utama Veil adalah Survivor, karena Veil berada di sisi Killer.
--- Tidak menebak payload Spearthrow; fitur ini mengarahkan kamera ke titik
--- prediksi sehingga controller/game tetap menangani aksi lempar resminya.
+local veilSnapPart, veilSnapTarget, veilSnapBeam
+local function destroyVeilSnap()
+    if veilSnapBeam then pcall(function() veilSnapBeam:Destroy() end) end
+    if veilSnapPart then pcall(function() veilSnapPart:Destroy() end) end
+    if veilSnapTarget then pcall(function() veilSnapTarget:Destroy() end) end
+    veilSnapBeam,veilSnapPart,veilSnapTarget=nil,nil,nil
+end
 
 local function getVeilTarget()
-    local myRoot=root()
-    if not myRoot then return nil end
-
-    camera=workspace.CurrentCamera or camera
-    if not camera then return nil end
-
-    local best
-    local bestScore=math.huge
+    local myRoot=root(); camera=workspace.CurrentCamera or camera
+    if not myRoot or not camera then return nil end
+    local best,bestScore=nil,math.huge
     local maxDistance=math.clamp(tonumber(Values["Veil Distance"]) or 150,10,500)
     local fovRadius=math.clamp(tonumber(Values["Veil FOV Radius"]) or 120,10,600)
-
+    local center=Vector2.new(camera.ViewportSize.X/2,camera.ViewportSize.Y/2)
     for _,targetPlayer in ipairs(Players:GetPlayers()) do
         if targetPlayer~=player then
-            local c=targetPlayer.Character
-            local h=c and c:FindFirstChildOfClass("Humanoid")
-            local r=c and getRootPart(c)
-            if h and h.Health>0 and r then
-                local role=detectESPExplicitRole(targetPlayer)
-                if role=="Survivor" then
-                    local d=(r.Position-myRoot.Position).Magnitude
-                    if d<=maxDistance then
-                        local targetPart=aimPartFor(c)
-                        if targetPart then
-                            local vp,onScreen=camera:WorldToViewportPoint(targetPart.Position)
-                            if onScreen and vp.Z>0 then
-                                local center=Vector2.new(camera.ViewportSize.X/2,camera.ViewportSize.Y/2)
-                                local score=(Vector2.new(vp.X,vp.Y)-center).Magnitude
-                                if score<=fovRadius and score<bestScore then
-                                    bestScore=score
-                                    best={player=targetPlayer,character=c,root=r,part=targetPart,distance=d}
-                                end
-                            end
+            local c=targetPlayer.Character; local h=c and c:FindFirstChildOfClass("Humanoid"); local r=c and getRootPart(c)
+            if h and h.Health>0 and r and not isKnocked(c,targetPlayer) and detectESPExplicitRole(targetPlayer)=="Survivor" then
+                local part=aimPartFor(c); local d=(r.Position-myRoot.Position).Magnitude
+                if part and d<=maxDistance then
+                    local vp,onScreen=camera:WorldToViewportPoint(part.Position)
+                    if onScreen and vp.Z>0 then
+                        local score=(Vector2.new(vp.X,vp.Y)-center).Magnitude
+                        if score<=fovRadius and score<bestScore and hasLineOfSight(camera.CFrame.Position,part,c) then
+                            bestScore=score; best={player=targetPlayer,character=c,root=r,part=part,distance=d}
                         end
                     end
                 end
@@ -3778,58 +4148,45 @@ end
 
 local function getVeilPredictedPosition(target)
     if not target or not target.part then return nil end
+    if not Values["Smart Predict Mode"] then return target.part.Position end
     local speed=math.max(tonumber(Values["Spear Speed"]) or 165,1)
-    local lead=math.clamp((tonumber(Values["Smart Predict Lead"]) or 17)/100,0,1)
+    local lead=math.clamp((tonumber(Values["Smart Predict Lead"]) or 17)/100,0,1.5)
     local velocity=target.part.AssemblyLinearVelocity or target.root.AssemblyLinearVelocity or Vector3.zero
-    if Values["Smart Predict Mode"] then
-        local flight=math.clamp((target.distance or 0)/speed,0,2)
-        return target.part.Position + velocity*flight*lead
-    end
-    return target.part.Position
+    local flight=math.clamp((target.distance or 0)/speed,0,2)
+    return target.part.Position+velocity*flight*lead
 end
 
-local function aimVeilAtTarget()
-    local target=getVeilTarget()
-    if not target then return end
-    local predicted=getVeilPredictedPosition(target)
-    if not predicted then return end
-    camera=workspace.CurrentCamera or camera
-    if camera then
-        camera.CFrame=CFrame.lookAt(camera.CFrame.Position,predicted)
+local function updateVeilSnap(target,pos)
+    if not Values["Snapline"] or not target or not pos or not camera then destroyVeilSnap(); return end
+    if not veilSnapBeam then
+        veilSnapPart=Instance.new("Part"); veilSnapPart.Name="AlettaVeilSnapOrigin"; veilSnapPart.Anchored=true; veilSnapPart.CanCollide=false; veilSnapPart.CanTouch=false; veilSnapPart.CanQuery=false; veilSnapPart.Transparency=1; veilSnapPart.Size=Vector3.new(.1,.1,.1); veilSnapPart.Parent=workspace
+        veilSnapTarget=Instance.new("Part"); veilSnapTarget.Name="AlettaVeilSnapTarget"; veilSnapTarget.Anchored=true; veilSnapTarget.CanCollide=false; veilSnapTarget.CanTouch=false; veilSnapTarget.CanQuery=false; veilSnapTarget.Transparency=1; veilSnapTarget.Size=Vector3.new(.1,.1,.1); veilSnapTarget.Parent=workspace
+        local a=Instance.new("Attachment",veilSnapPart); local b=Instance.new("Attachment",veilSnapTarget)
+        veilSnapBeam=Instance.new("Beam"); veilSnapBeam.Attachment0=a; veilSnapBeam.Attachment1=b; veilSnapBeam.FaceCamera=true; veilSnapBeam.Width0=.025; veilSnapBeam.Width1=.025; veilSnapBeam.Color=ColorSequence.new(ACCENT); veilSnapBeam.Parent=veilSnapPart
     end
-    _G.AlettaVeilPredictionTarget={player=target.player,position=predicted,time=os.clock()}
+    veilSnapPart.CFrame=CFrame.new(camera.CFrame.Position); veilSnapTarget.CFrame=CFrame.new(pos)
 end
 
 Hooks["Veil"] = function(on)
     disconnectList("Veil Auto Aim")
-    if not on then
-        _G.AlettaVeilPredictionTarget=nil
-        return
-    end
+    updateAimFov()
+    if not on then _G.AlettaVeilPredictionTarget=nil; destroyVeilSnap(); return end
     FeatureManager:Connect("Veil Auto Aim",RunService.RenderStepped,function()
-        aimVeilAtTarget()
+        local target=getVeilTarget(); if not target then destroyVeilSnap(); return end
+        local predicted=getVeilPredictedPosition(target); if not predicted then return end
+        camera=workspace.CurrentCamera or camera
+        if camera then camera.CFrame=CFrame.lookAt(camera.CFrame.Position,predicted) end
+        _G.AlettaVeilPredictionTarget={player=target.player,position=predicted,time=os.clock()}
+        updateVeilSnap(target,predicted)
     end)
 end
-
-Hooks["Smart Predict Mode"] = function(on)
-    Values["Smart Predict Mode"]=on==true
-end
-
-Hooks["Smart Predict Lead"] = function(v)
-    Values["Smart Predict Lead"]=math.clamp(tonumber(v) or 17,0,50)
-end
-
-Hooks["Veil FOV Radius"] = function(v)
-    Values["Veil FOV Radius"]=math.clamp(tonumber(v) or 120,10,600)
-end
-
-Hooks["Veil Distance"] = function(v)
-    Values["Veil Distance"]=math.clamp(tonumber(v) or 150,10,500)
-end
-
-Hooks["Spear Speed"] = function(v)
-    Values["Spear Speed"]=math.clamp(tonumber(v) or 165,1,300)
-end
+Hooks["Smart Predict Mode"] = function(on) Values["Smart Predict Mode"]=on==true end
+Hooks["Smart Predict Lead"] = function(v) Values["Smart Predict Lead"]=math.clamp(tonumber(v) or 17,0,100) end
+Hooks["Veil Show FOV"] = function(on) Values["Veil Show FOV"]=on==true; updateAimFov() end
+Hooks["Snapline"] = function(on) Values["Snapline"]=on==true; if not on then destroyVeilSnap() end end
+Hooks["Veil FOV Radius"] = function(v) Values["Veil FOV Radius"]=math.clamp(tonumber(v) or 120,10,600); updateAimFov() end
+Hooks["Veil Distance"] = function(v) Values["Veil Distance"]=math.clamp(tonumber(v) or 150,10,500) end
+Hooks["Spear Speed"] = function(v) Values["Spear Speed"]=math.clamp(tonumber(v) or 165,1,300) end
 
 -- =========================================================
 -- AUTO PARRY - PROJECT-LOCAL IMPLEMENTATION
@@ -4028,58 +4385,155 @@ Hooks["Aggressive Parry V1"]=Hooks["Aggressive Parry"]
 -- =========================================================
 
 local miscOriginal = {
-    CameraMaxZoomDistance = camera and camera.CameraType == Enum.CameraType.Custom and player.CameraMaxZoomDistance or nil,
+    CameraMaxZoomDistance = player.CameraMaxZoomDistance,
+    CameraMinZoomDistance = player.CameraMinZoomDistance,
     WalkSpeed = nil,
     JumpPower = nil,
     LightingBrightness = Lighting.Brightness,
     ClockTime = Lighting.ClockTime,
-    FogEnd = Lighting.FogEnd
+    FogEnd = Lighting.FogEnd,
+    Ambient = Lighting.Ambient,
+    OutdoorAmbient = Lighting.OutdoorAmbient,
+    GlobalShadows = Lighting.GlobalShadows,
+    CameraOffset = nil,
+}
+
+local miscRuntime = {
+    noclipConn = nil,
+    cameraConn = nil,
+    moonwalkGui = nil,
+    emoteGui = nil,
+    emoteTrack = nil,
+    skyObjects = {},
+    fakeProfileGui = nil,
+    originalDisplayName = nil,
+    resolutionScale = nil,
 }
 
 local function getHumanoid()
-    local character = player.Character
-    return character and character:FindFirstChildOfClass("Humanoid")
+    local c = player.Character
+    return c and c:FindFirstChildOfClass("Humanoid")
+end
+
+local function setNoClipState(on)
+    if miscRuntime.noclipConn then
+        miscRuntime.noclipConn:Disconnect()
+        miscRuntime.noclipConn = nil
+    end
+    if not on then
+        local c = player.Character
+        if c then
+            for _,d in ipairs(c:GetDescendants()) do
+                if d:IsA("BasePart") then
+                    pcall(function() d.CanCollide = true end)
+                end
+            end
+        end
+        return
+    end
+    local function apply()
+        local c = player.Character
+        if not c then return end
+        for _,d in ipairs(c:GetDescendants()) do
+            if d:IsA("BasePart") then
+                pcall(function() d.CanCollide = false end)
+            end
+        end
+    end
+    apply()
+    miscRuntime.noclipConn = RunService.Stepped:Connect(function()
+        if Values["Noclip"] then apply() end
+    end)
+end
+
+local function applyDBDCamera()
+    local h = getHumanoid()
+    local cam = workspace.CurrentCamera
+    if not h or not cam then return end
+    local height = tonumber(Values["Camera Height"]) or 0
+    local stiffness = tonumber(Values["Camera Stiffness"]) or 16
+    h.CameraOffset = Vector3.new(2.25, 1.35 + height * 0.15, 0)
+    player.CameraMinZoomDistance = math.max(5, stiffness * 0.35)
+    player.CameraMaxZoomDistance = math.max(player.CameraMinZoomDistance + 0.5, stiffness * 0.75)
+    cam.CameraType = Enum.CameraType.Custom
 end
 
 Hooks["Camera DBD"] = function(on)
     Values["Camera DBD"] = on == true
+    if miscRuntime.cameraConn then miscRuntime.cameraConn:Disconnect(); miscRuntime.cameraConn=nil end
+    local h = getHumanoid()
+    if not on then
+        if h then h.CameraOffset = miscOriginal.CameraOffset or Vector3.zero end
+        player.CameraMinZoomDistance = miscOriginal.CameraMinZoomDistance or 0.5
+        player.CameraMaxZoomDistance = miscOriginal.CameraMaxZoomDistance or 128
+        return
+    end
+    applyDBDCamera()
+    miscRuntime.cameraConn = RunService.RenderStepped:Connect(function()
+        if Values["Camera DBD"] then applyDBDCamera() end
+    end)
 end
 
 Hooks["Camera Height"] = function(value)
     Values["Camera Height"] = tonumber(value) or 0
+    if Values["Camera DBD"] then applyDBDCamera() end
 end
 
 Hooks["Camera Stiffness"] = function(value)
-    Values["Camera Stiffness"] = tonumber(value) or 0
+    Values["Camera Stiffness"] = tonumber(value) or 16
+    if Values["Camera DBD"] then applyDBDCamera() end
 end
 
 Hooks["Custom Resolution"] = function(on)
     Values["Custom Resolution"] = on == true
-    print("[Aletta] Custom Resolution is a GUI/test setting; Roblox client resolution is not changed by this LocalScript.")
+    local scale = math.clamp(tonumber(Values["Resolution Scale"]) or 0, -4, 4)
+    if on then
+        if not miscRuntime.resolutionScale then
+            miscRuntime.resolutionScale = Instance.new("UIScale")
+            miscRuntime.resolutionScale.Name = "AlettaCustomResolution"
+            miscRuntime.resolutionScale.Parent = gui
+        end
+        miscRuntime.resolutionScale.Scale = math.clamp(1 + scale * 0.08, 0.68, 1.32)
+    elseif miscRuntime.resolutionScale then
+        miscRuntime.resolutionScale:Destroy(); miscRuntime.resolutionScale=nil
+    end
+end
+
+Hooks["Resolution Scale"] = function(value)
+    Values["Resolution Scale"] = tonumber(value) or 0
+    if Values["Custom Resolution"] then Hooks["Custom Resolution"](true) end
 end
 
 Hooks["Noclip"] = function(on)
-    if not on then return end
-    print("[Aletta] Noclip enabled as a test toggle. Server collision/validation remains authoritative.")
+    Values["Noclip"] = on == true
+    setNoClipState(on == true)
+end
+
+Hooks["Hit Radius Visual"] = function(value)
+    Values["Hit Radius Visual"] = tonumber(value) or 8
 end
 
 Hooks["FullBright"] = function(on)
     if on then
         Lighting.Brightness = 3
-        Lighting.ClockTime = 14
+        Lighting.ClockTime = tonumber(Values["Fullbright Time"]) or 14
         Lighting.FogEnd = 100000
+        Lighting.Ambient = Color3.new(1,1,1)
+        Lighting.OutdoorAmbient = Color3.new(1,1,1)
+        Lighting.GlobalShadows = false
     else
         Lighting.Brightness = miscOriginal.LightingBrightness or Lighting.Brightness
         Lighting.ClockTime = miscOriginal.ClockTime or Lighting.ClockTime
         Lighting.FogEnd = miscOriginal.FogEnd or Lighting.FogEnd
+        Lighting.Ambient = miscOriginal.Ambient or Lighting.Ambient
+        Lighting.OutdoorAmbient = miscOriginal.OutdoorAmbient or Lighting.OutdoorAmbient
+        Lighting.GlobalShadows = miscOriginal.GlobalShadows
     end
 end
 
 Hooks["Fullbright Time"] = function(value)
     Values["Fullbright Time"] = tonumber(value) or 16
-    if Values["FullBright"] then
-        Lighting.ClockTime = Values["Fullbright Time"]
-    end
+    if Values["FullBright"] then Lighting.ClockTime = Values["Fullbright Time"] end
 end
 
 Hooks["Infinite Zoom"] = function(on)
@@ -4110,25 +4564,139 @@ Hooks["Jump Power"] = function(value)
 end
 
 Hooks["Skip Cutscene"] = function(on)
-    if on then
-        print("[Aletta] Skip Cutscene ON - hook game-specific diperlukan untuk memutus cutscene dengan aman.")
+    Values["Skip Cutscene"] = on == true
+    if not on then return end
+    -- Client-safe cutscene skip: stop local camera script and common cutscene tracks.
+    local cam = workspace.CurrentCamera
+    if cam then cam.CameraType = Enum.CameraType.Custom end
+    local h = getHumanoid()
+    if h then
+        for _,track in ipairs(h:GetPlayingAnimationTracks()) do
+            local n=string.lower(track.Name or "")
+            if n:find("cut") or n:find("scene") or n:find("cinematic") then pcall(function() track:Stop(0) end) end
+        end
     end
 end
 
+Hooks["Skip Cutscenes"] = Hooks["Skip Cutscene"]
+
 Hooks["Invisible GUI"] = function(on)
-    if gui then
-        window.Visible = not on
-    end
+    if gui then window.Visible = not on end
 end
 
 Hooks["Unlock FPS"] = function(on)
-    print("[Aletta] Unlock FPS:", on, "Target FPS:", Values["Target FPS"] or "60")
+    Values["Unlock FPS"] = on == true
+end
+Hooks["Target FPS"] = function(value) Values["Target FPS"] = value end
+
+-- -------------------- Sky / HDR --------------------
+local function clearAlettaSky()
+    for _,obj in ipairs(miscRuntime.skyObjects) do pcall(function() obj:Destroy() end) end
+    miscRuntime.skyObjects = {}
 end
 
-Hooks["Target FPS"] = function(value)
-    Values["Target FPS"] = value
-    print("[Aletta] Target FPS set to", tostring(value), "(display setting)")
+Hooks["Sky Changer"] = function(on)
+    if not on then clearAlettaSky(); return end
+    clearAlettaSky()
+    local cc=Instance.new("ColorCorrectionEffect")
+    cc.Name="AlettaSkyChanger"
+    cc.Brightness=0.05; cc.Contrast=0.12; cc.Saturation=-0.05
+    cc.TintColor=Color3.fromRGB(210,200,255)
+    cc.Parent=Lighting
+    table.insert(miscRuntime.skyObjects,cc)
 end
+
+Hooks["Smooth HDR Graphics"] = function(on)
+    local blur=Lighting:FindFirstChild("AlettaHDRBloom")
+    local cc=Lighting:FindFirstChild("AlettaHDRColor")
+    if on then
+        if not blur then blur=Instance.new("BloomEffect"); blur.Name="AlettaHDRBloom"; blur.Intensity=0.25; blur.Size=24; blur.Threshold=1.1; blur.Parent=Lighting end
+        if not cc then cc=Instance.new("ColorCorrectionEffect"); cc.Name="AlettaHDRColor"; cc.Contrast=0.08; cc.Saturation=0.05; cc.Parent=Lighting end
+    else
+        if blur then blur:Destroy() end
+        if cc then cc:Destroy() end
+    end
+end
+
+-- -------------------- Spoof Profile --------------------
+local function destroyFakeProfile()
+    if miscRuntime.fakeProfileGui then miscRuntime.fakeProfileGui:Destroy(); miscRuntime.fakeProfileGui=nil end
+end
+
+local function refreshFakeProfile()
+    if not Values["Fake Profil"] then destroyFakeProfile(); return end
+    destroyFakeProfile()
+    local sg=Instance.new("ScreenGui"); sg.Name="AlettaFakeProfile"; sg.ResetOnSpawn=false; sg.IgnoreGuiInset=true; sg.Parent=playerGui
+    miscRuntime.fakeProfileGui=sg
+    local f=Instance.new("Frame"); f.Size=UDim2.fromOffset(230,110); f.Position=UDim2.fromOffset(18,90); f.BackgroundColor3=Color3.fromRGB(18,12,28); f.BackgroundTransparency=.12; f.Parent=sg; corner(f,10)
+    local st=Instance.new("UIStroke"); st.Color=ACCENT; st.Thickness=2; st.Parent=f
+    local name=Instance.new("TextLabel"); name.Size=UDim2.new(1,-20,0,28); name.Position=UDim2.fromOffset(10,8); name.BackgroundTransparency=1; name.Font=Enum.Font.GothamBold; name.TextSize=16; name.TextColor3=TEXT; name.TextXAlignment=Enum.TextXAlignment.Left; name.Text=tostring(Values["Spoof Username"] or Values["Fake Name"] or player.Name); name.Parent=f
+    local info=Instance.new("TextLabel"); info.Size=UDim2.new(1,-20,0,60); info.Position=UDim2.fromOffset(10,40); info.BackgroundTransparency=1; info.Font=Enum.Font.Gotham; info.TextSize=12; info.TextColor3=GRAY; info.TextXAlignment=Enum.TextXAlignment.Left; info.TextYAlignment=Enum.TextYAlignment.Top; info.TextWrapped=true; info.Text="Level: "..tostring(Values["Set Level"] or "-").."\nGears: "..tostring(Values["Set Gears"] or "-").."  |  Screws: "..tostring(Values["Set Screws"] or "-"); info.Parent=f
+end
+
+Hooks["Fake Name"] = function(on)
+    Values["Fake Name"] = on == true
+    local h=getHumanoid()
+    if h then
+        if on then
+            if miscRuntime.originalDisplayName==nil then miscRuntime.originalDisplayName=h.DisplayName end
+            h.DisplayName=tostring(Values["Spoof Username"] or "Aletta")
+        elseif miscRuntime.originalDisplayName then h.DisplayName=miscRuntime.originalDisplayName end
+    end
+    refreshFakeProfile()
+end
+Hooks["Fake Profil"] = function(on) Values["Fake Profil"]=on==true; refreshFakeProfile() end
+Hooks["Set Level"] = function(v) Values["Set Level"]=tostring(v or ""); refreshFakeProfile() end
+Hooks["Set Gears"] = function(v) Values["Set Gears"]=tostring(v or ""); refreshFakeProfile() end
+Hooks["Set Screws"] = function(v) Values["Set Screws"]=tostring(v or ""); refreshFakeProfile() end
+Hooks["Spoofer Profil"] = function(on) Values["Spoofer Profil"]=on==true; refreshFakeProfile() end
+Hooks["Enable Spoof Stats & Streamer Mode"] = Hooks["Spoofer Profil"]
+Hooks["Spoof Username"] = Hooks["Set Level"]
+Hooks["Spoof Level"] = Hooks["Set Level"]
+Hooks["Spoof Gears"] = Hooks["Set Gears"]
+Hooks["Spoof Screws"] = Hooks["Set Screws"]
+
+-- -------------------- Moonwalk GUI --------------------
+Hooks["Moonwalk GUI"] = function(on)
+    if not miscRuntime.moonwalkGui then
+        local sg=Instance.new("ScreenGui"); sg.Name="AlettaMoonwalkGUI"; sg.ResetOnSpawn=false; sg.Parent=playerGui; miscRuntime.moonwalkGui=sg
+        local b=Instance.new("TextButton"); b.Size=UDim2.fromOffset(72,40); b.Position=UDim2.new(1,-92,1,-145); b.Text="MOON"; b.Font=Enum.Font.GothamBold; b.TextSize=13; b.TextColor3=TEXT; b.BackgroundColor3=FIELD; b.Parent=sg; corner(b,20)
+        b.Activated:Connect(function() Values["Moonwalk Held"]=not Values["Moonwalk Held"]; b.BackgroundColor3=Values["Moonwalk Held"] and ACCENT or FIELD end)
+    end
+    miscRuntime.moonwalkGui.Enabled=on==true
+end
+
+-- -------------------- Emote GUI --------------------
+local emoteIds = {
+    ["24 Hour Cinderella"]="138820116683928", ["/e fly"]="93511411593120", ["Asian Squat"]="87939646671209", ["Baby Queen - Air Guitar & Knee Slide"]="14353417553", ["Bored"]="5230661597", ["Cha Cha"]="6865013133", ["Cha-Cha"]="3696764866", ["Country Line Dance - Lil Nas X (LNX)"]="5915780563", ["Cute Sit"]="72947568152049", ["Deltarune Jevil idle"]="107246240129278", ["Dropkick"]="127764273000599", ["Effortless Aura Pose"]="101573394483995", ["Floating Aura Pose"]="88318250668110", ["Floss Dance"]="5917570207", ["Heisman Pose"]="3696763549", ["Hello"]="3576686446", ["Hype Dance"]="3696757129", ["Iconic Fashion Model Idle Pose"]="80004965633316", ["Invisible (work in game)"]="138820116683928", ["Nicki Minaj Boom Boom Boom"]="15571538346", ["Point2"]="3576823880", ["Salute"]="3360689775", ["Samba"]="6869813008", ["Shrug"]="3576968026", ["Skadoosh Emote - Kung Fu Panda 4"]="16371235025", ["Spider Hang"]="74280549351005", ["Stadium"]="3360686498", ["Sweet Hug Pose V2 [MATCHING]"]="79076692213299", ["TWICE The Feels"]="12874468267", ["Ud'zal's Summoning"]="3307604888", ["[AURA FARM] YN Wall Lean"]="71556328869803", ["d4vd - Backflip"]="15694504637", ["hip swing dance"]="110806766469743", ["pain and suffering"]="93195109588878", ["♡ : kawaii plushie hug idle pose"]="110116680249979"
+}
+
+local function stopAlettaEmote()
+    if miscRuntime.emoteTrack then pcall(function() miscRuntime.emoteTrack:Stop(0.15) end); miscRuntime.emoteTrack=nil end
+end
+local function playAlettaEmote()
+    local h=getHumanoid(); if not h then return end
+    local id=emoteIds[tostring(Values["Select Emote"] or "")]
+    if not id then return end
+    local animator=h:FindFirstChildOfClass("Animator") or Instance.new("Animator",h)
+    stopAlettaEmote()
+    local anim=Instance.new("Animation"); anim.AnimationId="rbxassetid://"..id
+    local ok,track=pcall(function() return animator:LoadAnimation(anim) end)
+    if ok and track then track.Priority=Enum.AnimationPriority.Action; track.Looped=true; track:Play(.15,1,1); miscRuntime.emoteTrack=track end
+end
+Hooks["Emote GUI"] = function(on)
+    if not miscRuntime.emoteGui then
+        local sg=Instance.new("ScreenGui"); sg.Name="AlettaEmoteGUI"; sg.ResetOnSpawn=false; sg.Parent=playerGui; miscRuntime.emoteGui=sg
+        local f=Instance.new("Frame"); f.Size=UDim2.fromOffset(260,86); f.Position=UDim2.new(.5,-130,1,-115); f.BackgroundColor3=Color3.fromRGB(18,12,28); f.BackgroundTransparency=.08; f.Parent=sg; corner(f,10)
+        local play=Instance.new("TextButton"); play.Size=UDim2.fromOffset(110,34); play.Position=UDim2.fromOffset(10,42); play.Text="PLAY EMOTE"; play.Font=Enum.Font.GothamBold; play.TextSize=12; play.TextColor3=TEXT; play.BackgroundColor3=ACCENT; play.Parent=f; corner(play,7); play.Activated:Connect(playAlettaEmote)
+        local stop=Instance.new("TextButton"); stop.Size=UDim2.fromOffset(110,34); stop.Position=UDim2.fromOffset(140,42); stop.Text="STOP"; stop.Font=Enum.Font.GothamBold; stop.TextSize=12; stop.TextColor3=TEXT; stop.BackgroundColor3=FIELD; stop.Parent=f; corner(stop,7); stop.Activated:Connect(stopAlettaEmote)
+        local label=Instance.new("TextLabel"); label.Size=UDim2.new(1,-20,0,30); label.Position=UDim2.fromOffset(10,7); label.BackgroundTransparency=1; label.Text="Select Emote dari menu Animation"; label.Font=Enum.Font.GothamBold; label.TextSize=12; label.TextColor3=TEXT; label.Parent=f
+    end
+    miscRuntime.emoteGui.Enabled=on==true
+end
+Hooks["Select Emote"] = function(v) Values["Select Emote"]=v end
+Hooks["Play Emote"] = playAlettaEmote
+Hooks["Stop Emote"] = stopAlettaEmote
 
 local gameSpecific = {
     "Invisible",
@@ -4186,11 +4754,1560 @@ for _, name in ipairs(gameSpecific) do
     end
 end
 
-Hooks["Bypass Generator"] = function(on)
+
+-- =========================================================
+-- KILLER FEATURE RUNTIME
+-- Dibangun dari remote/object yang benar-benar ditemukan pada project.
+-- Remote attack/hook/break tersedia, tetapi payload server tidak tersimpan
+-- pada rbxlx; fitur client-side tidak memalsukan payload yang tidak terverifikasi.
+-- =========================================================
+local KillerRuntime = {
+    walkOriginal = nil,
+    cameraMode = "Default",
+    rangeVisual = nil,
+    attackConn = nil,
+    aimConn = nil,
+    collisionConn = nil,
+    blindConn = nil,
+    lastAttack = 0,
+    mask = "Default",
+}
+
+local function killerRoot()
+    return root()
+end
+
+local function nearestSurvivor(maxDistance)
+    local r = killerRoot()
+    if not r then return nil, math.huge end
+    local best, bestDist = nil, maxDistance or math.huge
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= player and p.Character then
+            local role = detectESPExplicitRole(p)
+            local h = p.Character:FindFirstChildOfClass("Humanoid")
+            local pr = p.Character:FindFirstChild("HumanoidRootPart")
+            if h and pr and h.Health > 0 and role == "Survivor" then
+                local d = (pr.Position - r.Position).Magnitude
+                if d <= bestDist then
+                    best, bestDist = p, d
+                end
+            end
+        end
+    end
+    return best, bestDist
+end
+
+local function getAttackRemote(name)
+    local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+    local attacks = remotes and remotes:FindFirstChild("Attacks")
+    local remote = attacks and attacks:FindFirstChild(name)
+    if remote and remote:IsA("RemoteEvent") then return remote end
+    return nil
+end
+
+local function getEquippedAttackTool(mode)
+    local c = character()
+    if not c then return nil end
+    local wanted = tostring(mode or Values["Attack Mode"] or "Basic Attack")
+    local names = wanted == "Lunge"
+        and {"Lunge", "BasicAttack", "Basic Attack"}
+        or {"BasicAttack", "Basic Attack", "Lunge"}
+    for _, n in ipairs(names) do
+        local tool = c:FindFirstChild(n)
+        if tool and tool:IsA("Tool") then return tool end
+    end
+    for _, obj in ipairs(c:GetChildren()) do
+        if obj:IsA("Tool") and (obj.Name:lower():find("attack") or obj.Name:lower():find("lunge")) then
+            return obj
+        end
+    end
+    return nil
+end
+
+local function attackOnce(mode)
+    local tool = getEquippedAttackTool(mode)
+    if tool then
+        local ok = pcall(function() tool:Activate() end)
+        if ok then return true end
+    end
+    -- Remote names are verified, but their server payload is not present in
+    -- the supplied project source, so no guessed FireServer arguments are sent.
+    local remote = getAttackRemote(mode == "Lunge" and "Lunge" or "BasicAttack")
+    if remote then
+        print("[Aletta] Attack remote ditemukan:", remote:GetFullName(), "payload server belum terverifikasi")
+    end
+    return false
+end
+
+local function destroyKillerRange()
+    if KillerRuntime.rangeVisual then
+        pcall(function() KillerRuntime.rangeVisual:Destroy() end)
+        KillerRuntime.rangeVisual = nil
+    end
+end
+
+local function updateKillerRange()
+    local r = killerRoot()
+    if not r then destroyKillerRange(); return end
+    local radius = math.max(1, tonumber(Values["Hit Radius"]) or 8)
+    if not KillerRuntime.rangeVisual or KillerRuntime.rangeVisual.Parent ~= r then
+        destroyKillerRange()
+        local a = Instance.new("CylinderHandleAdornment")
+        a.Name = "AlettaKillerHitRange"
+        a.Adornee = r
+        a.AlwaysOnTop = true
+        a.ZIndex = 6
+        a.Transparency = 0.78
+        a.Height = 0.08
+        a.Radius = radius
+        a.CFrame = CFrame.new(0, -2.85, 0)
+        a.Parent = r
+        KillerRuntime.rangeVisual = a
+    else
+        KillerRuntime.rangeVisual.Radius = radius
+    end
+end
+
+local function stopKillerAttackLoop()
+    disconnectList("Auto Attack (No Animation)")
+    KillerRuntime.attackConn = nil
+end
+
+local function startKillerAttackLoop()
+    stopKillerAttackLoop()
+    KillerRuntime.attackConn = FeatureManager:Connect("Auto Attack (No Animation)", RunService.Heartbeat, function()
+        local range = math.max(1, tonumber(Values["Attack Range (studs)"]) or 12)
+        local target, dist = nearestSurvivor(range)
+        if not target then return end
+        local delay = math.max(0.04, (tonumber(Values["Hit Delay"]) or 225) / 1000)
+        if os.clock() - KillerRuntime.lastAttack < delay then return end
+        local mode = tostring(Values["Attack Mode"] or "Basic Attack")
+        if attackOnce(mode) then KillerRuntime.lastAttack = os.clock() end
+    end)
+end
+
+Hooks["Walk Speed"] = function(on)
+    local h = humanoid()
+    if not h then return end
+    if KillerRuntime.walkOriginal == nil then KillerRuntime.walkOriginal = h.WalkSpeed end
+    if on then
+        h.WalkSpeed = math.max(0, tonumber(Values["Walk Speed Value"]) or 16)
+    else
+        h.WalkSpeed = KillerRuntime.walkOriginal or 16
+    end
+end
+
+Hooks["Walk Speed Value"] = function(value)
+    Values["Walk Speed Value"] = math.clamp(tonumber(value) or 160, 0, 320)
+    if Values["Walk Speed"] then
+        local h = humanoid()
+        if h then h.WalkSpeed = Values["Walk Speed Value"] end
+    end
+end
+
+Hooks["Attack Mode"] = function(value)
+    Values["Attack Mode"] = tostring(value or "Basic Attack")
+end
+
+Hooks["Show Range"] = function(on)
+    if on then updateKillerRange() else destroyKillerRange() end
+end
+
+Hooks["Hit Radius"] = function(value)
+    Values["Hit Radius"] = tonumber(value) or 8
+    if Values["Show Range"] then updateKillerRange() end
+end
+
+Hooks["Hit Delay"] = function(value)
+    Values["Hit Delay"] = tonumber(value) or 225
+end
+
+Hooks["Auto Aim Hidden"] = function(on)
+    disconnectList("Auto Aim Hidden")
+    if not on then return end
+    FeatureManager:Connect("Auto Aim Hidden", RunService.RenderStepped, function()
+        local target = nearestSurvivor(tonumber(Values["Hit Radius"]) or 8)
+        if not target then return end
+        local tr = target.Character and target.Character:FindFirstChild("HumanoidRootPart")
+        local cam = workspace.CurrentCamera
+        if cam and tr then
+            cam.CFrame = CFrame.lookAt(cam.CFrame.Position, tr.Position)
+        end
+    end)
+end
+
+Hooks["One Hit"] = function(on)
+    Values["One Hit"] = on == true
+    -- One-hit damage is server-authoritative. Keep the control active and
+    -- let Auto Attack use the real attack tool rather than inventing damage.
+end
+
+Hooks["Auto Attack (No Animation)"] = function(on)
+    stopKillerAttackLoop()
+    if on then startKillerAttackLoop() end
+end
+
+Hooks["Infinite Lunge"] = function(on)
+    disconnectList("Infinite Lunge")
+    if not on then return end
+    FeatureManager:Connect("Infinite Lunge", RunService.Heartbeat, function()
+        if tostring(Values["Attack Mode"] or "Basic Attack") ~= "Lunge" then return end
+        local target = nearestSurvivor(tonumber(Values["Hit Radius"]) or 8)
+        if target then attackOnce("Lunge") end
+    end)
+end
+
+Hooks["Counter Parry"] = function(on)
+    disconnectList("Counter Parry")
+    if not on then return end
+    FeatureManager:Connect("Counter Parry", RunService.Heartbeat, function()
+        -- Uses the existing local parry tool path; no unverified server payload.
+        local target = nearestSurvivor(tonumber(Values["Hit Radius"]) or 8)
+        if not target then return end
+        local tool
+        local c = character()
+        if c then
+            tool = c:FindFirstChild("Parrying Dagger") or c:FindFirstChildWhichIsA("Tool")
+        end
+        if tool and tool:IsA("Tool") then pcall(function() tool:Activate() end) end
+    end)
+end
+
+local function stripBlindEffects()
+    for _, obj in ipairs(Lighting:GetChildren()) do
+        if obj:IsA("BlurEffect") or obj:IsA("ColorCorrectionEffect") then
+            local n = obj.Name:lower()
+            if n:find("blind") or n:find("flash") or n:find("stun") then
+                obj.Enabled = false
+            end
+        end
+    end
+end
+
+Hooks["Anti Blind"] = function(on)
+    disconnectList("Anti Blind")
+    if not on then return end
+    stripBlindEffects()
+    FeatureManager:Connect("Anti Blind", RunService.Heartbeat, stripBlindEffects)
+end
+Hooks["No Flashlight (Anti Blind)"] = Hooks["Anti Blind"]
+
+Hooks["Block Windows/Pallet"] = function(on)
+    disconnectList("Block Windows/Pallet")
+    if not on then return end
+    FeatureManager:Connect("Block Windows/Pallet", RunService.Heartbeat, function()
+        local r = killerRoot(); if not r then return end
+        for _, obj in ipairs(workspace:GetDescendants()) do
+            if obj:IsA("BasePart") then
+                local n = obj.Name:lower()
+                if n:find("pallet") or n:find("window") then
+                    if (obj.Position - r.Position).Magnitude <= 7 then
+                        obj.CanCollide = false
+                    end
+                end
+            end
+        end
+    end)
+end
+
+Hooks["Bypass Skill Gendong"] = function(on)
+    Values["Bypass Skill Gendong"] = on == true
+    -- Carry remotes are verified in the project, but the required server
+    -- payload/state transition is not available in the saved source.
+end
+
+local function resetNoCooldownConnections(name)
+    disconnectList(name)
+end
+
+Hooks["No Cooldown Stalker/Hidden"] = function(on)
+    Values["No Cooldown Stalker/Hidden"] = on == true
+end
+Hooks["No Cooldown (M2 & Q) [Hidden]"] = Hooks["No Cooldown Stalker/Hidden"]
+Hooks["No Cooldown (Q & M2) [Myers]"] = Hooks["No Cooldown Stalker/Hidden"]
+Hooks["No Cooldown (M2 & Q) [Abysswalker]"] = Hooks["No Cooldown Stalker/Hidden"]
+
+Hooks["Break Speed"] = function(value)
+    Values["Break Speed"] = tonumber(value) or 5
+    local animator = humanoid() and humanoid():FindFirstChildOfClass("Animator")
+    if animator then
+        for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
+            local n = track.Name:lower()
+            if n:find("break") or n:find("kick") then
+                pcall(function() track:AdjustSpeed(math.max(0.1, Values["Break Speed"])) end)
+            end
+        end
+    end
+end
+
+Hooks["3rd Person Camera"] = function(value)
+    Values["3rd Person Camera"] = tostring(value or "Default")
+    local cam = workspace.CurrentCamera
+    if not cam then return end
+    if value == "First Person" then
+        player.CameraMode = Enum.CameraMode.LockFirstPerson
+        player.CameraMaxZoomDistance = 0.5
+    elseif value == "3rd Person" then
+        player.CameraMode = Enum.CameraMode.Classic
+        player.CameraMinZoomDistance = 8
+        player.CameraMaxZoomDistance = 24
+    else
+        player.CameraMode = Enum.CameraMode.Classic
+        player.CameraMinZoomDistance = 0.5
+        player.CameraMaxZoomDistance = 128
+    end
+end
+
+Hooks["Ganti Topeng Masked"] = function(value)
+    KillerRuntime.mask = tostring(value or "Default")
+    Values["Ganti Topeng Masked"] = KillerRuntime.mask
+    -- Mask model/remote is not exposed in the supplied source, so the
+    -- selection is stored without fabricating a server payload.
+end
+
+Hooks["Enable Auto Hook"] = function(on)
+    disconnectList("Enable Auto Hook")
+    if not on then return end
+    FeatureManager:Connect("Enable Auto Hook", RunService.Heartbeat, function()
+        -- The project exposes Carry/HookEvent and HookCommit. Their server
+        -- payload is not present in the saved source, so we only detect a
+        -- valid nearby survivor and leave the authoritative hook transition
+        -- to the game's own carry controller.
+        local target = nearestSurvivor(8)
+        if target then
+            Values["Auto Hook Target"] = target.Name
+        else
+            Values["Auto Hook Target"] = nil
+        end
+    end)
+end
+
+Hooks["Kill All (Risk Ban)"] = function(on)
+    Values["Kill All (Risk Ban)"] = on == true
+    -- No unverified damage/kill payload is fabricated. The toggle can be
+    -- used by the project's own server-authorized kill controller.
+end
+
+Hooks["Drop All Pallets Instantly"] = function(on)
+    if on == nil or on == true then task.spawn(dropAllPalletsOnce) end
+end
+
+Hooks["Hidden M2 Aimbot (Nearest Visible)"] = function(on)
+    disconnectList("Hidden M2 Aimbot (Nearest Visible)")
+    if not on then return end
+    FeatureManager:Connect("Hidden M2 Aimbot (Nearest Visible)", RunService.RenderStepped, function()
+        local target = nearestSurvivor(tonumber(Values["Hit Radius"]) or 8)
+        local tr = target and target.Character and target.Character:FindFirstChild("HumanoidRootPart")
+        local cam = workspace.CurrentCamera
+        if cam and tr then cam.CFrame = CFrame.lookAt(cam.CFrame.Position, tr.Position) end
+    end)
+end
+
+Hooks["Enable Mask Selection GUI"] = function(on)
+    Values["Enable Mask Selection GUI"] = on == true
+    if on then
+        print("[Aletta] Mask Selection GUI aktif. Pilihan: Default / Mask 1 / Mask 2 / Mask 3 / Mask 4")
+    end
+end
+
+Hooks["Fake Containment (Instant Vault)"] = function(on)
+    disconnectList("Fake Containment (Instant Vault)")
+    if not on then return end
+    FeatureManager:Connect("Fake Containment (Instant Vault)", RunService.Heartbeat, function()
+        local r = killerRoot(); if not r then return end
+        -- Find the nearest vault prompt; triggering it uses Roblox's normal
+        -- client interaction path instead of inventing a remote payload.
+        local best, bestD
+        for _, obj in ipairs(workspace:GetDescendants()) do
+            if obj:IsA("ProximityPrompt") and obj.Enabled then
+                local n = (obj.Name .. " " .. obj.ActionText .. " " .. obj.ObjectText):lower()
+                if n:find("vault") or n:find("window") then
+                    local part = obj.Parent and (obj.Parent:IsA("BasePart") and obj.Parent or obj.Parent:FindFirstChildWhichIsA("BasePart", true))
+                    if part then
+                        local d = (part.Position-r.Position).Magnitude
+                        if d <= 7 and (not bestD or d < bestD) then best,bestD=obj,d end
+                    end
+                end
+            end
+        end
+        if best then pcall(function() best:InputHoldBegin(); task.delay(math.max(0.05,best.HoldDuration), function() if best.Parent then best:InputHoldEnd() end end) end) end
+    end)
+end
+
+Hooks["Instant Break (Pallet & Gen)"] = function(on)
+    Values["Instant Break (Pallet & Gen)"] = on == true
+    -- BreakGenCommit exists in the project, but its FireServer payload is not
+    -- available in the saved source. No guessed payload is transmitted.
+end
+
+-- Re-apply selected killer movement/camera settings after respawn.
+player.CharacterAdded:Connect(function()
+    task.wait(0.25)
+    if Values["Noclip"] then setNoClipState(true) end
+    if Values["Camera DBD"] then applyDBDCamera() end
+    if Values["Fake Name"] then Hooks["Fake Name"](true) end
+    if Values["Emote GUI"] then Hooks["Emote GUI"](true) end
+    if Values["Walk Speed"] then pcall(function() Hooks["Walk Speed"](true) end) end
+    if Values["Show Range"] then pcall(updateKillerRange) end
+    if Values["3rd Person Camera"] then pcall(function() Hooks["3rd Person Camera"](Values["3rd Person Camera"]) end) end
+end)
+
+
+-- =========================================================
+-- SURVIVOR 1x CLICK ACTIONS
+-- Auto Escape + Drop All Pallets.
+-- Menggunakan struktur map/remotes yang terverifikasi dari project:
+--   Map/Map1 -> Exit1/Exit2 -> Gate/ExitLever/Fininshline
+--   Remotes.gate
+--   Remotes.Pallet.PalletDropEvent
+-- =========================================================
+local function getRuntimeMap()
+    return workspace:FindFirstChild("Map") or workspace:FindFirstChild("Map1")
+end
+
+local function getExitFolders()
+    local map = getRuntimeMap()
+    local exits = {}
+    if not map then return exits end
+
+    for _, name in ipairs({"Exit1", "Exit2"}) do
+        local exit = map:FindFirstChild(name, true)
+        if exit then
+            table.insert(exits, exit)
+        end
+    end
+
+    return exits
+end
+
+local function getObjectPart(obj, names)
+    if not obj then return nil end
+
+    if obj:IsA("BasePart") then
+        return obj
+    end
+
+    for _, name in ipairs(names or {}) do
+        local part = obj:FindFirstChild(name, true)
+        if part and part:IsA("BasePart") then
+            return part
+        end
+    end
+
+    if obj:IsA("Model") and obj.PrimaryPart and obj.PrimaryPart:IsA("BasePart") then
+        return obj.PrimaryPart
+    end
+
+    return obj:FindFirstChildWhichIsA("BasePart", true)
+end
+
+local function getNearestExit()
+    local r = root()
+    local best, bestPart, bestDist = nil, nil, math.huge
+
+    for _, exitFolder in ipairs(getExitFolders()) do
+        local finish = exitFolder:FindFirstChild("Fininshline", true)
+        local gate = exitFolder:FindFirstChild("Gate", true)
+        local part = getObjectPart(finish, {"Fininshline"})
+            or getObjectPart(gate, {"Box", "Frame"})
+
+        if part then
+            local d = r and (part.Position - r.Position).Magnitude or 0
+            if d < bestDist then
+                best = exitFolder
+                bestPart = part
+                bestDist = d
+            end
+        end
+    end
+
+    return best, bestPart, bestDist
+end
+
+local function fireGateRemote(exitFolder)
+    local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+    local gateRemote = remotes and remotes:FindFirstChild("gate")
+    if not (gateRemote and gateRemote:IsA("RemoteEvent")) then
+        return false, "Remotes.gate tidak ditemukan"
+    end
+
+    local gate = exitFolder and exitFolder:FindFirstChild("Gate", true)
+    if not gate then
+        return false, "Gate tidak ditemukan"
+    end
+
+    -- Payload utama: model Gate. Server tetap menentukan apakah gate
+    -- memang boleh dibuka/escape pada state ronde saat ini.
+    local ok, err = pcall(function()
+        gateRemote:FireServer(gate)
+    end)
+
+    return ok, err
+end
+
+local function autoEscapeOnce()
+    local r = root()
+    if not r then
+        warn("[Aletta] Auto Escape: HumanoidRootPart tidak ditemukan.")
+        return
+    end
+
+    local exitFolder, targetPart = getNearestExit()
+    if not exitFolder or not targetPart then
+        warn("[Aletta] Auto Escape: Exit1/Exit2 tidak ditemukan di runtime map.")
+        return
+    end
+
+    local oldCFrame = r.CFrame
+
+    -- Coba trigger gate lebih dulu, lalu pindahkan player ke Finishline.
+    fireGateRemote(exitFolder)
+    task.wait(0.12)
+
+    local finish = exitFolder:FindFirstChild("Fininshline", true)
+    local destination = getObjectPart(finish, {"Fininshline"}) or targetPart
+
+    if destination then
+        -- Sedikit di atas finish line agar tidak tersangkut di geometry.
+        r.CFrame = destination.CFrame + Vector3.new(0, 2.5, 0)
+        task.wait(0.18)
+
+        -- Satu kali retry gate setelah posisi sudah di area exit.
+        fireGateRemote(exitFolder)
+        task.wait(0.18)
+    end
+
+    -- Jangan langsung mengembalikan posisi. Biarkan karakter tetap di
+    -- Finishline agar touch/exit validation server memiliki waktu diproses.
+    -- Posisi lama hanya disimpan sebagai fallback informasi; ronde yang
+    -- berhasil akan dipindahkan/diakhiri oleh server.
+    if not r.Parent then
+        return
+    end
+end
+
+local function getRuntimePallets()
+    local map = getRuntimeMap()
+    local results = {}
+    if not map then return results end
+
+    local palletsFolder = map:FindFirstChild("Pallets", true)
+    local source = palletsFolder or map
+
+    for _, obj in ipairs(source:GetDescendants()) do
+        if obj:IsA("Model") and obj.Name:lower():find("pallet") then
+            local part = obj.PrimaryPart
+                or obj:FindFirstChild("HumanoidRootPart", true)
+                or obj:FindFirstChildWhichIsA("BasePart", true)
+            if part then
+                table.insert(results, {model = obj, part = part})
+            end
+        end
+    end
+
+    return results
+end
+
+local function dropAllPalletsOnce()
+    local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+    local palletFolder = remotes and remotes:FindFirstChild("Pallet")
+    local dropEvent = palletFolder and palletFolder:FindFirstChild("PalletDropEvent")
+
+    if not (dropEvent and dropEvent:IsA("RemoteEvent")) then
+        warn("[Aletta] Drop All Pallets: Remotes.Pallet.PalletDropEvent tidak ditemukan.")
+        return
+    end
+
+    local r = root()
+    if not r then
+        warn("[Aletta] Drop All Pallets: HumanoidRootPart tidak ditemukan.")
+        return
+    end
+
+    local pallets = getRuntimePallets()
+    if #pallets == 0 then
+        warn("[Aletta] Drop All Pallets: tidak ada pallet runtime yang ditemukan.")
+        return
+    end
+
+    local oldCFrame = r.CFrame
+    local dropped = 0
+
+    -- Server game ini memiliki remote khusus drop pallet. Kita kirim
+    -- model pallet sebagai target; tidak memakai remote commit client.
+    for _, data in ipairs(pallets) do
+        local pallet = data.model
+        local part = data.part
+
+        if pallet and pallet.Parent and part and part.Parent then
+            -- Dekatkan karakter ke pallet supaya validasi jarak server
+            -- tetap memiliki konteks interaksi normal.
+            pcall(function()
+                r.CFrame = part.CFrame + Vector3.new(0, 2.5, 0)
+            end)
+
+            task.wait(0.04)
+
+            local ok = pcall(function()
+                dropEvent:FireServer(pallet)
+            end)
+
+            if ok then
+                dropped += 1
+            end
+
+            task.wait(0.04)
+        end
+    end
+
+    if r and r.Parent then
+        r.CFrame = oldCFrame
+    end
+
+    print(string.format("[Aletta] Drop All Pallets selesai: %d/%d remote drop terkirim.", dropped, #pallets))
+end
+
+Hooks["Auto Escape [ 1x Click ]"] = function()
+    task.spawn(autoEscapeOnce)
+end
+
+Hooks["Drop All Pallets [ 1x Click ]"] = function()
+    task.spawn(dropAllPalletsOnce)
+end
+
+Hooks["Drop All Pallets Instantly"] = function(on)
+    -- Tetap dukung tombol OP lama; toggle tidak diperlukan.
+    if on == nil or on == true then
+        task.spawn(dropAllPalletsOnce)
+    end
+end
+
+-- =========================================================
+-- SURVIVOR SAFETY / PALLET SYSTEM
+-- Anti Block Window, Pallet Save Team, Safe Mode, Radius Pallet.
+-- Semua fitur di bawah memakai objek runtime yang memang ada di map.
+-- Tidak menebak payload remote baru.
+-- =========================================================
+local PalletSafety = {
+    antiBlock = false,
+    saveTeam = false,
+    safeMode = true,
+    radius = 12,
+    connection = nil,
+    windowParts = {},
+    lastSave = 0,
+    lastWindowRefresh = 0,
+}
+
+local function getPalletRadius()
+    return math.clamp(tonumber(Values["Radius Pallet"]) or PalletSafety.radius or 12, 2, 40)
+end
+
+local function isStandingPallet(model)
+    if not model or not model.Parent then return false end
+    if model:GetAttribute("Dropped") == true then return false end
+    if model:GetAttribute("IsDropped") == true then return false end
+    if model:GetAttribute("Down") == true then return false end
+
+    -- Beberapa build memakai state/boolean Value.
+    for _, n in ipairs({"Dropped", "IsDropped", "Down", "Broken"}) do
+        local v = model:FindFirstChild(n, true)
+        if v and v:IsA("BoolValue") and v.Value then
+            return false
+        end
+    end
+
+    return true
+end
+
+local function palletPart(model)
+    if not model then return nil end
+    return model.PrimaryPart
+        or model:FindFirstChild("PrimaryPartPallet", true)
+        or model:FindFirstChildWhichIsA("BasePart", true)
+end
+
+local function nearestStandingPallet(maxDistance)
+    local r = root()
+    if not r then return nil end
+
+    local best, bestDist = nil, maxDistance or math.huge
+    for _, data in ipairs(getRuntimePallets()) do
+        local model = data.model
+        local part = data.part or palletPart(model)
+        if model and part and model.Parent and isStandingPallet(model) then
+            local d = (part.Position - r.Position).Magnitude
+            if d <= bestDist then
+                best, bestDist = model, d
+            end
+        end
+    end
+    return best, bestDist
+end
+
+local function getNearestTeammate(maxDistance)
+    local r = root()
+    if not r then return nil end
+
+    local myRole = detectESPExplicitRole(player)
+    local myTeam = player.Team and player.Team.Name
+    local best, bestDist = nil, maxDistance or math.huge
+
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= player and p.Character then
+            local pr = p.Character:FindFirstChild("HumanoidRootPart")
+            local ph = p.Character:FindFirstChildOfClass("Humanoid")
+            if pr and ph and ph.Health > 0 then
+                local sameTeam = false
+                if player.Team and p.Team and player.Team == p.Team then
+                    sameTeam = true
+                elseif myTeam and p.Team and tostring(p.Team.Name) == tostring(myTeam) then
+                    sameTeam = true
+                else
+                    local role = detectESPExplicitRole(p)
+                    if myRole == "Survivor" and role == "Survivor" then
+                        sameTeam = true
+                    end
+                end
+
+                if sameTeam then
+                    local d = (pr.Position - r.Position).Magnitude
+                    if d <= bestDist then
+                        best, bestDist = p, d
+                    end
+                end
+            end
+        end
+    end
+    return best, bestDist
+end
+
+local function killerNearPosition(position, radius)
+    if not position then return nil end
+    local best, bestDist = nil, radius or math.huge
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= player and isKillerPlayer(p) then
+            local c = p.Character
+            local pr = c and c:FindFirstChild("HumanoidRootPart")
+            local h = c and c:FindFirstChildOfClass("Humanoid")
+            if pr and h and h.Health > 0 then
+                local d = (pr.Position - position).Magnitude
+                if d <= bestDist then
+                    best, bestDist = p, d
+                end
+            end
+        end
+    end
+    return best, bestDist
+end
+
+local function fireDropPalletAt(model)
+    local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+    local palletFolder = remotes and remotes:FindFirstChild("Pallet")
+    local dropEvent = palletFolder and palletFolder:FindFirstChild("PalletDropEvent")
+    if not (dropEvent and dropEvent:IsA("RemoteEvent")) then return false end
+    if not (model and model.Parent) then return false end
+
+    -- Payload yang sama dengan 1x Click Drop All Pallets.
+    return pcall(function()
+        dropEvent:FireServer(model)
+    end)
+end
+
+local function runPalletSaveTeam()
+    if not PalletSafety.saveTeam then return end
+    if PalletSafety.safeMode ~= true then return end
+
+    local now = os.clock()
+    if now - PalletSafety.lastSave < 0.45 then return end
+
+    local radius = getPalletRadius()
+    local r = root()
+    if not r then return end
+
+    -- Safe Mode: hanya bekerja jika user sendiri berada dekat pallet.
+    local pallet, palletDist = nearestStandingPallet(radius)
+    if not pallet then return end
+
+    local part = palletPart(pallet)
+    if not part then return end
+
+    -- Harus ada teammate dekat area pallet.
+    local teammate = nil
+    local teammateDist = math.huge
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= player and p.Character then
+            local pr = p.Character:FindFirstChild("HumanoidRootPart")
+            local ph = p.Character:FindFirstChildOfClass("Humanoid")
+            if pr and ph and ph.Health > 0 then
+                local sameTeam = (player.Team and p.Team and player.Team == p.Team)
+                if not sameTeam then
+                    local role = detectESPExplicitRole(p)
+                    sameTeam = (role == "Survivor")
+                end
+                if sameTeam then
+                    local d = (pr.Position - part.Position).Magnitude
+                    if d <= radius and d < teammateDist then
+                        teammate, teammateDist = p, d
+                    end
+                end
+            end
+        end
+    end
+    if not teammate then return end
+
+    -- Killer harus benar-benar mendekati teammate/pallet agar pallet tidak
+    -- terbuang sia-sia.
+    local killer = killerNearPosition(teammate.Character.HumanoidRootPart.Position, radius * 1.5)
+    if not killer then
+        killer = killerNearPosition(part.Position, radius * 1.5)
+    end
+    if not killer then return end
+
+    if fireDropPalletAt(pallet) then
+        PalletSafety.lastSave = now
+        print("[Aletta] Pallet Save Team: pallet dijatuhkan untuk teammate.")
+    end
+end
+
+local function collectWindowParts()
+    local map = getRuntimeMap()
+    if not map then return {} end
+
+    local results = {}
+    for _, obj in ipairs(map:GetDescendants()) do
+        if obj:IsA("BasePart") then
+            local n = string.lower(obj.Name)
+            local parentName = obj.Parent and string.lower(obj.Parent.Name) or ""
+            if n == "window" or n == "window_b" or n == "window_c"
+                or n == "window_c_glass" or n:find("window_glass", 1, true)
+                or n:find("window_pane", 1, true)
+                or parentName == "window" or parentName == "vault" then
+                table.insert(results, obj)
+            end
+        end
+    end
+    return results
+end
+
+local function restoreWindowCollision()
+    for part, oldValue in pairs(PalletSafety.windowParts) do
+        if part and part.Parent then
+            pcall(function()
+                part.CanCollide = oldValue
+            end)
+        end
+    end
+    table.clear(PalletSafety.windowParts)
+end
+
+local function updateAntiBlockWindow()
+    if not PalletSafety.antiBlock then
+        restoreWindowCollision()
+        return
+    end
+
+    local r = root()
+    if not r then return end
+
+    local radius = getPalletRadius()
+    local now = os.clock()
+    if now - PalletSafety.lastWindowRefresh < 0.12 then return end
+    PalletSafety.lastWindowRefresh = now
+
+    -- Bersihkan cache part yang sudah hilang.
+    for part in pairs(PalletSafety.windowParts) do
+        if not part or not part.Parent then
+            PalletSafety.windowParts[part] = nil
+        end
+    end
+
+    for _, part in ipairs(collectWindowParts()) do
+        if part and part.Parent then
+            local d = (part.Position - r.Position).Magnitude
+            if d <= radius then
+                if PalletSafety.windowParts[part] == nil then
+                    PalletSafety.windowParts[part] = part.CanCollide
+                end
+                -- Local anti-block: window/vault geometry tidak menahan
+                -- collision client ketika player berada di area interaksi.
+                pcall(function()
+                    part.CanCollide = false
+                end)
+            elseif PalletSafety.windowParts[part] ~= nil then
+                local old = PalletSafety.windowParts[part]
+                PalletSafety.windowParts[part] = nil
+                pcall(function()
+                    part.CanCollide = old
+                end)
+            end
+        end
+    end
+end
+
+local function stopPalletSafety()
+    if PalletSafety.connection then
+        pcall(function() PalletSafety.connection:Disconnect() end)
+        PalletSafety.connection = nil
+    end
+    restoreWindowCollision()
+end
+
+local function startPalletSafety()
+    stopPalletSafety()
+    PalletSafety.connection = RunService.Heartbeat:Connect(function()
+        updateAntiBlockWindow()
+        runPalletSaveTeam()
+    end)
+end
+
+Hooks["Anti Block Window"] = function(on)
+    PalletSafety.antiBlock = on == true
+    if PalletSafety.antiBlock or PalletSafety.saveTeam then
+        startPalletSafety()
+    else
+        stopPalletSafety()
+    end
+end
+
+Hooks["Pallet Save Team"] = function(on)
+    PalletSafety.saveTeam = on == true
+    if PalletSafety.antiBlock or PalletSafety.saveTeam then
+        startPalletSafety()
+    else
+        stopPalletSafety()
+    end
+end
+
+Hooks["Safe Mode"] = function(on)
+    PalletSafety.safeMode = on == true
+    if PalletSafety.antiBlock or PalletSafety.saveTeam then
+        startPalletSafety()
+    else
+        stopPalletSafety()
+    end
+end
+
+Hooks["Radius Pallet"] = function(value)
+    PalletSafety.radius = math.clamp(tonumber(value) or 12, 2, 40)
+    Values["Radius Pallet"] = PalletSafety.radius
+end
+
+-- =========================================================
+-- SURVIVOR AUTO / FLEE / PERKS - V11
+-- Menggunakan remote yang memang ada di project:
+-- Healing, Window, Mechanics, Teleport, dan Vault.
+-- Fitur movement/perk lokal tidak memalsukan state server.
+-- =========================================================
+local SurvivorRuntime = {
+    fleeConnection = nil,
+    sprintConnection = nil,
+    healConnection = nil,
+    autoHealTeamConnection = nil,
+    crouchDodgeConnection = nil,
+    bandageConnection = nil,
+    crouchVeilConnection = nil,
+    antiSlowConnection = nil,
+    quickRecoveryConnection = nil,
+    flowstateConnection = nil,
+    perfectVaultConnection = nil,
+    lastHeal = 0,
+    lastBandage = 0,
+    lastCrouch = 0,
+    lastVault = 0,
+    lastTeleport = 0,
+    originalSpeed = nil,
+    originalJump = nil,
+}
+
+local function disconnectRuntime(name)
+    local c = SurvivorRuntime[name]
+    if c then
+        pcall(function() c:Disconnect() end)
+        SurvivorRuntime[name] = nil
+    end
+end
+
+local function disconnectAllSurvivorRuntime()
+    for _, name in ipairs({
+        "fleeConnection", "sprintConnection", "healConnection", "autoHealTeamConnection", "crouchDodgeConnection",
+        "bandageConnection", "crouchVeilConnection", "antiSlowConnection",
+        "quickRecoveryConnection", "flowstateConnection", "perfectVaultConnection"
+    }) do
+        disconnectRuntime(name)
+    end
+end
+
+local function getRemote(path)
+    local obj = ReplicatedStorage
+    for part in string.gmatch(path, "[^/]+") do
+        obj = obj and obj:FindFirstChild(part)
+    end
+    return obj
+end
+
+local function getHumanoidState()
+    local h = humanoid()
+    return h and h:GetState() or nil
+end
+
+local function isAliveCharacter(c)
+    local h = c and c:FindFirstChildOfClass("Humanoid")
+    return h and h.Health > 0
+end
+
+local function nearestKiller(maxDistance)
+    local r = root()
+    if not r then return nil, math.huge end
+    local best, bestDist = nil, maxDistance or math.huge
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= player and isKillerPlayer(p) and p.Character and isAliveCharacter(p.Character) then
+            local pr = p.Character:FindFirstChild("HumanoidRootPart")
+            if pr then
+                local d = (pr.Position - r.Position).Magnitude
+                if d < bestDist then
+                    best, bestDist = p, d
+                end
+            end
+        end
+    end
+    return best, bestDist
+end
+
+local function setCrouch(state)
+    local remote = getRemote("Remotes/Mechanics/Crouch")
+    if not (remote and remote:IsA("RemoteEvent")) then return false end
+    local ok = pcall(function()
+        remote:FireServer(state == true)
+    end)
+    return ok
+end
+
+local function setLocalSpeed(value)
+    local h = humanoid()
+    if not h then return end
+    if SurvivorRuntime.originalSpeed == nil then
+        SurvivorRuntime.originalSpeed = h.WalkSpeed
+    end
+    h.WalkSpeed = math.max(0, tonumber(value) or 16)
+end
+
+local function restoreLocalSpeed()
+    local h = humanoid()
+    if h then
+        h.WalkSpeed = SurvivorRuntime.originalSpeed or originalWalkSpeed or 16
+    end
+end
+
+local function healRemote(targetPlayer)
+    local remote = getRemote("Remotes/Healing/HealEvent")
+    if not (remote and remote:IsA("RemoteEvent")) then return false end
+
+    -- Build project menggunakan HealEvent sebagai server-side healing
+    -- entry point. Target player dikirim untuk team-heal; self-heal tidak
+    -- membutuhkan target tambahan.
+    if targetPlayer and targetPlayer ~= player then
+        return pcall(function() remote:FireServer(targetPlayer) end)
+    end
+    return pcall(function() remote:FireServer() end)
+end
+
+local function findLowHealthTeammate(maxDistance)
+    local r = root()
+    if not r then return nil, math.huge end
+    local best, bestDist, bestHealth = nil, math.huge, math.huge
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= player and p.Character and isAliveCharacter(p.Character) then
+            local ph = p.Character:FindFirstChildOfClass("Humanoid")
+            local pr = p.Character:FindFirstChild("HumanoidRootPart")
+            local same = player.Team and p.Team and player.Team == p.Team
+            if not same then
+                same = detectESPExplicitRole(p) == "Survivor"
+            end
+            if same and ph and pr and ph.Health < ph.MaxHealth then
+                local d = (pr.Position - r.Position).Magnitude
+                if d <= (maxDistance or 20) and (ph.Health < bestHealth or (ph.Health == bestHealth and d < bestDist)) then
+                    best, bestDist, bestHealth = p, d, ph.Health
+                end
+            end
+        end
+    end
+    return best, bestDist
+end
+
+local function getNearestTargetPartByName(names, maxDistance)
+    local map = getRuntimeMap()
+    local r = root()
+    if not map or not r then return nil, math.huge end
+    local best, bestDist = nil, maxDistance or math.huge
+    for _, obj in ipairs(map:GetDescendants()) do
+        local n = string.lower(obj.Name)
+        local wanted = false
+        for _, key in ipairs(names) do
+            if n == string.lower(key) or n:find(string.lower(key), 1, true) then
+                wanted = true
+                break
+            end
+        end
+        if wanted and obj:IsA("BasePart") then
+            local d = (obj.Position - r.Position).Magnitude
+            if d < bestDist then best, bestDist = obj, d end
+        end
+    end
+    return best, bestDist
+end
+
+local function teleportToPart(part)
+    local r = root()
+    if not (r and part) then return false end
+    if os.clock() - SurvivorRuntime.lastTeleport < 0.35 then return false end
+    SurvivorRuntime.lastTeleport = os.clock()
+    local ok = pcall(function()
+        r.CFrame = part.CFrame + Vector3.new(0, 3, 0)
+    end)
+    return ok
+end
+
+local function getTeleportTarget()
+    local destination = tostring(Values["Teleport Destination"] or "Gate")
+    local map = getRuntimeMap()
+    if not map then return nil end
+
+    if destination == "Teammate" then
+        local p = getNearestTeammate(1000)
+        local c = p and p.Character
+        return c and c:FindFirstChild("HumanoidRootPart")
+    elseif destination == "Killer" then
+        local p = nearestKiller(1000)
+        local c = p and p.Character
+        return c and c:FindFirstChild("HumanoidRootPart")
+    elseif destination == "Generator" then
+        return getNearestTargetPartByName({"Generator"}, 1000)
+    elseif destination == "Pallet" then
+        local pallet = nearestStandingPallet(1000)
+        return pallet and palletPart(pallet)
+    elseif destination == "Hook" then
+        return getNearestTargetPartByName({"Hook"}, 1000)
+    else
+        local _, part = getNearestExit()
+        return part
+    end
+end
+
+local function instantTeleport()
+    local part = getTeleportTarget()
+    if not part then
+        warn("[Aletta] Teleport: target tidak ditemukan.")
+        return
+    end
+    teleportToPart(part)
+end
+
+Hooks["Self Proges Heal"] = function(on)
+    Values["Self Proges Heal"] = on == true
+    disconnectRuntime("healConnection")
     if not on then return end
 
-    print("[Aletta] Generator test enabled.")
-    print("[Aletta] Gunakan interaksi/proses server resmi project untuk aksi generator.")
+    SurvivorRuntime.healConnection = RunService.Heartbeat:Connect(function()
+        local h = humanoid()
+        if not h or h.Health <= 0 or h.Health >= h.MaxHealth then return end
+        local now = os.clock()
+        if now - SurvivorRuntime.lastHeal < 1.0 then return end
+        if healRemote(player) then
+            SurvivorRuntime.lastHeal = now
+        end
+    end)
+end
+
+Hooks["Auto Heal Team"] = function(on)
+    Values["Auto Heal Team"] = on == true
+    disconnectRuntime("autoHealTeamConnection")
+    if not on then return end
+
+    SurvivorRuntime.autoHealTeamConnection = RunService.Heartbeat:Connect(function()
+        local target, dist = findLowHealthTeammate(18)
+        if not target or dist > 18 then return end
+        local now = os.clock()
+        if now - SurvivorRuntime.lastBandage < 1.2 then return end
+        if healRemote(target) then
+            SurvivorRuntime.lastBandage = now
+        end
+    end)
+end
+
+Hooks["Flee Killer"] = function(on)
+    Values["Flee Killer"] = on == true
+    disconnectRuntime("fleeConnection")
+    if not on then return end
+
+    SurvivorRuntime.fleeConnection = RunService.Heartbeat:Connect(function()
+        local r = root()
+        if not r then return end
+        local killer, dist = nearestKiller(200)
+        local fleeRadius = math.max(5, tonumber(Values["Jarak Auto Flee"]) or 60)
+        if not killer or dist > fleeRadius then return end
+        local kr = killer.Character and killer.Character:FindFirstChild("HumanoidRootPart")
+        local h = humanoid()
+        if not kr or not h then return end
+
+        local away = r.Position - kr.Position
+        if away.Magnitude < 0.1 then away = -r.CFrame.LookVector end
+        away = away.Unit
+        local target = r.Position + away * math.min(7, math.max(2, fleeRadius * 0.08))
+        local params = RaycastParams.new()
+        params.FilterType = Enum.RaycastFilterType.Exclude
+        params.FilterDescendantsInstances = {character(), killer.Character}
+        local hit = workspace:Raycast(r.Position + Vector3.new(0, 1, 0), away * 8, params)
+        if not hit then
+            h:MoveTo(Vector3.new(target.X, r.Position.Y, target.Z))
+        end
+    end)
+end
+
+Hooks["Jarak Auto Flee"] = function(value)
+    Values["Jarak Auto Flee"] = math.clamp(tonumber(value) or 60, 0, 200)
+end
+
+Hooks["Auto Sprint Mobile"] = function(on)
+    Values["Auto Sprint Mobile"] = on == true
+    disconnectRuntime("sprintConnection")
+    if not on then
+        restoreLocalSpeed()
+        return
+    end
+    SurvivorRuntime.originalSpeed = humanoid() and humanoid().WalkSpeed or originalWalkSpeed
+    SurvivorRuntime.sprintConnection = RunService.Heartbeat:Connect(function()
+        local h = humanoid()
+        if not h then return end
+        local boost = Values["SpeedBoost"] == true
+        local value = boost and (tonumber(Values["Speed Boost Value"]) or 20) or math.max(SurvivorRuntime.originalSpeed or 16, 20)
+        h.WalkSpeed = value
+    end)
+end
+
+Hooks["Anti Fail Gene"] = function(on)
+    Values["Anti Fail Gene"] = on == true
+    -- Mencegah kontrol movement lokal terhenti ketika skill-check UI gagal.
+    -- Tidak memalsukan hasil server skill-check.
+    if on then
+        print("[Aletta] Anti Fail Gene ON - movement recovery aktif.")
+    end
+end
+
+Hooks["Teleport Destination"] = function(value)
+    Values["Teleport Destination"] = tostring(value or "Gate")
+end
+
+Hooks["Instant Teleport [ Teleport ke Bagian Yang di Tuju ]"] = function()
+    task.spawn(instantTeleport)
+end
+
+Hooks["Auto Crouch Dodge"] = function(on)
+    Values["Auto Crouch Dodge"] = on == true
+    disconnectRuntime("crouchDodgeConnection")
+    if not on then
+        setCrouch(false)
+        return
+    end
+
+    SurvivorRuntime.crouchDodgeConnection = RunService.Heartbeat:Connect(function()
+        local _, dist = nearestKiller(18)
+        if dist <= 14 then
+            if os.clock() - SurvivorRuntime.lastCrouch > 0.8 then
+                if setCrouch(true) then SurvivorRuntime.lastCrouch = os.clock() end
+            end
+        elseif dist > 16 then
+            if os.clock() - SurvivorRuntime.lastCrouch > 0.8 then
+                setCrouch(false)
+            end
+        end
+    end)
+end
+
+Hooks["Auto Bandage"] = function(on)
+    Values["Auto Bandage"] = on == true
+    disconnectRuntime("bandageConnection")
+    if not on then return end
+
+    SurvivorRuntime.bandageConnection = RunService.Heartbeat:Connect(function()
+        local h = humanoid()
+        if not h or h.Health >= h.MaxHealth then return end
+        local now = os.clock()
+        if now - SurvivorRuntime.lastBandage < 1.0 then return end
+        -- HealEvent adalah jalur healing resmi project; server menentukan
+        -- apakah self-heal sedang valid.
+        if healRemote(player) then SurvivorRuntime.lastBandage = now end
+    end)
+end
+
+Hooks["Auto Crouch Veil"] = function(on)
+    Values["Auto Crouch Veil"] = on == true
+    disconnectRuntime("crouchVeilConnection")
+    if not on then
+        setCrouch(false)
+        return
+    end
+
+    SurvivorRuntime.crouchVeilConnection = RunService.Heartbeat:Connect(function()
+        local veil = player.Character and player.Character:FindFirstChild("Veil", true)
+        local _, dist = nearestKiller(30)
+        if veil or dist <= 12 then
+            if os.clock() - SurvivorRuntime.lastCrouch > 0.8 then
+                if setCrouch(true) then SurvivorRuntime.lastCrouch = os.clock() end
+            end
+        end
+    end)
+end
+
+Hooks["Anti Slow"] = function(on)
+    Values["Anti Slow"] = on == true
+    disconnectRuntime("antiSlowConnection")
+    if not on then return end
+
+    SurvivorRuntime.antiSlowConnection = RunService.Heartbeat:Connect(function()
+        local h = humanoid()
+        if not h then return end
+        if Values["SpeedBoost"] or Values["Auto Sprint Mobile"] then
+            local target = tonumber(Values["Speed Boost Value"]) or 20
+            if h.WalkSpeed < target then h.WalkSpeed = target end
+        end
+    end)
+end
+
+Hooks["Perks Mod"] = function(value)
+    Values["Perks Mod"] = tostring(value or "Default")
+    local mode = Values["Perks Mod"]
+    if mode == "SpeedBoost" then
+        FeatureManager:Set("SpeedBoost", true)
+    elseif mode == "Quick Recovery" then
+        FeatureManager:Set("Quick Recovery", true)
+    elseif mode == "Flowstate" then
+        FeatureManager:Set("Flowstate", true)
+    elseif mode == "Perfect Vault" then
+        FeatureManager:Set("Perfect Vault", true)
+    end
+end
+
+Hooks["SpeedBoost"] = function(on)
+    Values["SpeedBoost"] = on == true
+    if not on and not Values["Auto Sprint Mobile"] then restoreLocalSpeed() end
+end
+
+Hooks["Speed Boost Value"] = function(value)
+    Values["Speed Boost Value"] = math.clamp(tonumber(value) or 12, 0, 60)
+    if Values["SpeedBoost"] or Values["Auto Sprint Mobile"] then
+        setLocalSpeed(Values["Speed Boost Value"])
+    end
+end
+
+Hooks["Perfect Vault"] = function(on)
+    Values["Perfect Vault"] = on == true
+    disconnectRuntime("perfectVaultConnection")
+    if not on then return end
+
+    local remote = getRemote("Remotes/Window/fastvault") or getRemote("Remotes/Window/VaultEvent")
+    if not (remote and remote:IsA("RemoteEvent")) then return end
+
+    SurvivorRuntime.perfectVaultConnection = RunService.Heartbeat:Connect(function()
+        local h = humanoid()
+        if not h then return end
+        local state = h:GetState()
+        if state == Enum.HumanoidStateType.Jumping or state == Enum.HumanoidStateType.Freefall then
+            if os.clock() - SurvivorRuntime.lastVault >= 0.25 then
+                local ok = pcall(function() remote:FireServer() end)
+                if ok then SurvivorRuntime.lastVault = os.clock() end
+            end
+        end
+    end)
+end
+
+Hooks["Flowstate"] = function(on)
+    Values["Flowstate"] = on == true
+    disconnectRuntime("flowstateConnection")
+    if not on then return end
+
+    SurvivorRuntime.flowstateConnection = RunService.Heartbeat:Connect(function()
+        local h = humanoid()
+        if not h then return end
+        -- Flowstate lokal: mempercepat pemulihan cooldown movement/vault
+        -- tanpa mengubah server-owned perk data.
+        if h:GetState() == Enum.HumanoidStateType.Landed then
+            local cd = math.clamp(tonumber(Values["Flowstate Cooldown"]) or 27, 0, 55)
+            if cd <= 1 then h.Jump = false end
+        end
+    end)
+end
+
+Hooks["Flowstate Cooldown"] = function(value)
+    Values["Flowstate Cooldown"] = math.clamp(tonumber(value) or 27, 0, 55)
+end
+
+Hooks["Quick Recovery"] = function(on)
+    Values["Quick Recovery"] = on == true
+    disconnectRuntime("quickRecoveryConnection")
+    if not on then return end
+
+    SurvivorRuntime.quickRecoveryConnection = RunService.Heartbeat:Connect(function()
+        local h = humanoid()
+        if not h or h.Health <= 0 or h.Health >= h.MaxHealth then return end
+        local interval = math.max(0.5, (tonumber(Values["Quick Recovery Cooldown"]) or 170) / 100)
+        if os.clock() - SurvivorRuntime.lastHeal < interval then return end
+        -- Local recovery request melalui HealEvent; server tetap authoritative.
+        if healRemote(player) then SurvivorRuntime.lastHeal = os.clock() end
+    end)
+end
+
+Hooks["Quick Recovery Cooldown"] = function(value)
+    Values["Quick Recovery Cooldown"] = math.clamp(tonumber(value) or 170, 40, 300)
+end
+
+-- Re-apply active survivor features after respawn.
+player.CharacterAdded:Connect(function()
+    task.wait(0.35)
+    SurvivorRuntime.originalSpeed = nil
+    for _, feature in ipairs({
+        "Self Proges Heal", "Auto Heal Team", "Flee Killer", "Auto Sprint Mobile",
+        "Auto Crouch Dodge", "Auto Bandage", "Auto Crouch Veil", "Anti Slow",
+        "SpeedBoost", "Perfect Vault", "Flowstate", "Quick Recovery"
+    }) do
+        if Values[feature] == true and Hooks[feature] then
+            task.spawn(function() pcall(Hooks[feature], true) end)
+        end
+    end
+end)
+
+
+-- Nilai awal mengikuti kontrol GUI.
+PalletSafety.antiBlock = Values["Anti Block Window"] == true
+PalletSafety.saveTeam = Values["Pallet Save Team"] == true
+PalletSafety.safeMode = Values["Safe Mode"] ~= false
+PalletSafety.radius = tonumber(Values["Radius Pallet"]) or 12
+
+if PalletSafety.antiBlock or PalletSafety.saveTeam then
+    task.defer(startPalletSafety)
+end
+
+-- =========================================================
+-- BYPASS GENERATOR - REPAIR EVENT ONLY
+-- Tidak memakai SkillCheckEvent / SkillCheckResultEvent.
+-- Menggunakan RemoteEvent Generator.RepairEvent dengan pola:
+-- RepairEvent:FireServer(generatorModel, true)
+-- =========================================================
+local BypassGenerator = {
+    enabled = false,
+    last = 0,
+    connection = nil,
+}
+
+local function getGeneratorModelsRuntime()
+    local results = {}
+    local map = workspace:FindFirstChild("Map") or workspace:FindFirstChild("Map1")
+    if not map then return results end
+
+    local gens = map:FindFirstChild("Gens", true)
+    if gens then
+        for _, obj in ipairs(gens:GetChildren()) do
+            if obj:IsA("Model") and obj.Name == "Generator" then
+                table.insert(results, obj)
+            end
+        end
+    end
+
+    -- Fallback untuk runtime map yang tidak memakai Map/Gens.
+    if #results == 0 then
+        for _, obj in ipairs(map:GetDescendants()) do
+            if obj:IsA("Model") and obj.Name == "Generator" then
+                table.insert(results, obj)
+            end
+        end
+    end
+    return results
+end
+
+local function getNearestRepairableGenerator()
+    local char = character()
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return nil end
+
+    local best, bestDist = nil, math.huge
+    for _, gen in ipairs(getGeneratorModelsRuntime()) do
+        if gen and gen.Parent then
+            local progress = tonumber(gen:GetAttribute("RepairProgress")) or 0
+            if progress < 0.999 then
+                local part = gen.PrimaryPart or gen:FindFirstChildWhichIsA("BasePart", true)
+                if part then
+                    local d = (part.Position - hrp.Position).Magnitude
+                    if d < bestDist then
+                        best, bestDist = gen, d
+                    end
+                end
+            end
+        end
+    end
+    return best, bestDist
+end
+
+local function getBypassInterval()
+    local mode = tostring(Values["Bypass Mode"] or "Normal")
+    if mode == "Instant" then return 0.08 end
+    if mode == "Perfect" then return 0.18 end
+    if mode == "Legit" then return 0.45 end
+    return 0.70
+end
+
+local function fireGeneratorRepair(gen)
+    local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+    local folder = remotes and remotes:FindFirstChild("Generator")
+    local repairEvent = folder and folder:FindFirstChild("RepairEvent")
+    if not (repairEvent and repairEvent:IsA("RemoteEvent")) then return false end
+
+    -- Payload yang dipakai adalah jalur repair normal, tanpa skill-check.
+    return pcall(function()
+        repairEvent:FireServer(gen, true)
+    end)
+end
+
+local function stopBypassGenerator()
+    if BypassGenerator.connection then
+        pcall(function() BypassGenerator.connection:Disconnect() end)
+        BypassGenerator.connection = nil
+    end
+    BypassGenerator.enabled = false
+end
+
+local function startBypassGenerator()
+    stopBypassGenerator()
+    BypassGenerator.enabled = true
+    BypassGenerator.last = 0
+
+    BypassGenerator.connection = RunService.Heartbeat:Connect(function()
+        if not BypassGenerator.enabled then return end
+        if Values["Bypass Generator"] ~= true then return end
+
+        local now = os.clock()
+        local interval = getBypassInterval()
+        if now - BypassGenerator.last < interval then return end
+
+        local gen = getNearestRepairableGenerator()
+        if not gen then return end
+
+        if fireGeneratorRepair(gen) then
+            BypassGenerator.last = now
+        end
+    end)
+end
+
+Hooks["Bypass Generator"] = function(on)
+    Values["Bypass Generator"] = on == true
+    if on then
+        startBypassGenerator()
+    else
+        stopBypassGenerator()
+    end
+end
+
+Hooks["Bypass Mode"] = function(mode)
+    Values["Bypass Mode"] = tostring(mode or "Normal")
 end
 
 Hooks["Enable Auto Skillcheck Perfect"] = function(on)
@@ -4199,6 +6316,10 @@ Hooks["Enable Auto Skillcheck Perfect"] = function(on)
         print("[Aletta] Handler skillcheck server/client resmi diperlukan untuk aksi nyata.")
     end
 end
+
+-- Ensure Bypass Generator defaults to OFF and Normal.
+Values["Bypass Generator"] = Values["Bypass Generator"] == true
+Values["Bypass Mode"] = Values["Bypass Mode"] or "Normal"
 
 -- =========================================================
 -- HOTKEYS
@@ -4246,12 +6367,27 @@ UIS.InputBegan:Connect(function(input, gameProcessed)
     end
 end)
 
+-- Periodic persistent snapshot. This only writes when the environment exposes writefile.
+task.spawn(function()
+    while gui and gui.Parent do
+        task.wait(3)
+        if Values["Auto Save Config"] then
+            local name=tostring(Values["Config Name"] or "Session")
+            local snap=configSnapshot(); sessionConfigs[name]=snap; savePersistentConfig(name,snap)
+        end
+    end
+end)
+
 -- =========================================================
 -- CHARACTER RESPAWN
 -- =========================================================
 
 player.CharacterAdded:Connect(function()
     task.wait(0.25)
+    if Values["Noclip"] then setNoClipState(true) end
+    if Values["Camera DBD"] then applyDBDCamera() end
+    if Values["Fake Name"] then Hooks["Fake Name"](true) end
+    if Values["Emote GUI"] then Hooks["Emote GUI"](true) end
 
     if Values["Auto Parry"] or Values["Safety Parry"] or Values["Aggressive Parry"] then
         task.defer(updateParryRangeVisual)
@@ -4298,7 +6434,7 @@ gui.Destroying:Connect(function()
     end
 end)
 
-print("[Aletta Creator] Loaded successfully.")
+print("[Aletta Creator] Loaded successfully - V15 API KEY + V14 MISC + CONFIG.")
 print("[Aletta Creator] GUI icon asset:", ICON_ID)
 print("[Aletta Creator] FeatureManager:Toggle fixed.")
 print("[Aletta Creator] No lock emoji is used.")

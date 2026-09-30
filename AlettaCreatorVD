@@ -751,18 +751,13 @@ local headerStroke = new("UIStroke", {
     Transparency = 0.05
 }, headerBar)
 
-local headerACLeft = new("TextLabel", {
+local headerACLeft = new("ImageLabel", {
     Name = "HeaderACLeft",
-    Text = "AC",
-    Font = Enum.Font.GothamBlack,
-    TextSize = 17,
-    TextColor3 = ACCENT,
-    TextStrokeTransparency = 0.5,
+    Image = LOGO_ID,
+    ScaleType = Enum.ScaleType.Fit,
     BackgroundTransparency = 1,
-    Position = UDim2.fromOffset(10, 0),
-    Size = UDim2.fromOffset(42, 48),
-    TextXAlignment = Enum.TextXAlignment.Center,
-    TextYAlignment = Enum.TextYAlignment.Center,
+    Position = UDim2.fromOffset(9, 4),
+    Size = UDim2.fromOffset(42, 40),
     ZIndex = 12
 }, top)
 
@@ -798,19 +793,14 @@ local headerWarning = new("TextLabel", {
     ZIndex = 12
 }, top)
 
-local headerACRight = new("TextLabel", {
+local headerACRight = new("ImageLabel", {
     Name = "HeaderACRight",
-    Text = "AC",
-    Font = Enum.Font.GothamBlack,
-    TextSize = 17,
-    TextColor3 = ACCENT,
-    TextStrokeTransparency = 0.5,
+    Image = LOGO_ID,
+    ScaleType = Enum.ScaleType.Fit,
     BackgroundTransparency = 1,
     AnchorPoint = Vector2.new(1, 0),
-    Position = UDim2.new(1, -42, 0, 0),
-    Size = UDim2.fromOffset(42, 48),
-    TextXAlignment = Enum.TextXAlignment.Center,
-    TextYAlignment = Enum.TextYAlignment.Center,
+    Position = UDim2.new(1, -42, 0, 4),
+    Size = UDim2.fromOffset(42, 40),
     ZIndex = 12
 }, top)
 
@@ -2711,7 +2701,7 @@ local colorPresets = {
 }
 
 local themePresets = {
-    ["PURPLE"]  = {main=Color3.fromRGB(95,45,180),  accent=Color3.fromRGB(180,90,255),  outline=Color3.fromRGB(225,205,255), font=Color3.fromRGB(255,255,255), background=Color3.fromRGB(15,8,25), asset=""},
+    ["PURPLE"]  = {main=Color3.fromRGB(95,45,180),  accent=Color3.fromRGB(180,90,255),  outline=Color3.fromRGB(225,205,255), font=Color3.fromRGB(255,255,255), background=Color3.fromRGB(15,8,25), asset="rbxassetid://94003702624009"},
     ["PINK"]    = {main=Color3.fromRGB(145,45,105), accent=Color3.fromRGB(255,95,190),  outline=Color3.fromRGB(255,205,235), font=Color3.fromRGB(255,255,255), background=Color3.fromRGB(25,8,18), asset="rbxassetid://115489304339560"},
     ["YELLOW"]  = {main=Color3.fromRGB(145,105,25), accent=Color3.fromRGB(255,215,70),  outline=Color3.fromRGB(255,240,170), font=Color3.fromRGB(255,255,255), background=Color3.fromRGB(25,20,7), asset="rbxassetid://98915755062432"},
     ["GREEN"]   = {main=Color3.fromRGB(35,120,65),  accent=Color3.fromRGB(90,230,130),  outline=Color3.fromRGB(195,255,215), font=Color3.fromRGB(255,255,255), background=Color3.fromRGB(7,22,12), asset="rbxassetid://82044886382201"},
@@ -2881,8 +2871,9 @@ local function applyConfigVisuals()
     -- Header follows the active theme completely.
     headerBar.BackgroundColor3 = PANEL
     headerStroke.Color = outlineColor
-    headerACLeft.TextColor3 = accentColor
-    headerACRight.TextColor3 = accentColor
+    local activeThemeAsset = selectedTheme and selectedTheme.asset or LOGO_ID
+    if headerACLeft:IsA("ImageLabel") then headerACLeft.Image = activeThemeAsset end
+    if headerACRight:IsA("ImageLabel") then headerACRight.Image = activeThemeAsset end
     headerLogo.TextColor3 = fontColor
     headerWarning.TextColor3 = outlineColor:Lerp(fontColor, 0.35)
     headerBarShade.BackgroundColor3 = BG:Lerp(Color3.new(0,0,0), 0.25)
@@ -4323,6 +4314,8 @@ do
         BG = t.background
         if icon then icon.Image = t.asset or "" end
         if bgImg then bgImg.Image = t.asset or "" end
+        if headerACLeft and headerACLeft:IsA("ImageLabel") then headerACLeft.Image = t.asset or "" end
+        if headerACRight and headerACRight:IsA("ImageLabel") then headerACRight.Image = t.asset or "" end
     end
 end
 

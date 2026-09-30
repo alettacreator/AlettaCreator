@@ -82,8 +82,6 @@ for _, name in ipairs({"AlettaCreatorGUI", "AlettaCrosshair", "AlettaESPLabels",
 end
 
 local Values = {}
-Values["Auto Skill Check Mode"] = "Legit"
-Values["Auto Skill Check"] = false
 Values["Auto Sprint Mobile"] = false
 Values["ESP Range"] = 600
 Values["ESP Distance"] = 600
@@ -272,9 +270,8 @@ local CONFIG = {
                 S("Quick Recovery Cooldown", 40, 300, 170)
             }},
             {name = "Skill Generator", controls = {
-                T("Auto Skill Check"),
-                S("Skill Check Speed", 0, 28, 14),
-                D("Auto Skill Check Mode", {"Legit", "Normal", "Perfection"}, "Legit")
+                T("Bypass Generator"),
+                D("Bypass Mode", {"Normal", "Legit", "Perfect", "Instant"}, "Normal")
             }},
             {name = "Camera Menu", controls = {
                 T("Custom FOV"),
@@ -735,66 +732,53 @@ local top = new("Frame", {
     ZIndex = 10
 }, window)
 
+local headerBar = new("ImageLabel", {
+    Name = "AlettaHeaderBar",
+    Image = "rbxassetid://106783278057227",
+    ScaleType = Enum.ScaleType.Crop,
+    BackgroundTransparency = 1,
+    Size = UDim2.fromScale(1, 1),
+    Position = UDim2.fromScale(0, 0),
+    ImageTransparency = 0,
+    ZIndex = 10,
+    Active = false
+}, top)
+corner(headerBar, 10)
+
+local headerBarShade = new("Frame", {
+    Name = "AlettaHeaderBarShade",
+    Size = UDim2.fromScale(1, 1),
+    BackgroundColor3 = Color3.fromRGB(0, 0, 0),
+    BackgroundTransparency = 0.72,
+    BorderSizePixel = 0,
+    ZIndex = 10,
+    Active = false
+}, top)
+corner(headerBarShade, 10)
+
+-- Header image-only: no ALETTA CREATOR / VIOLENCE DISTRICT / AC SCRIPT text.
 local headerLogo = new("ImageLabel", {
     Name = "AlettaHeaderLogo",
-    Image = HEADER_LOGO_ID,
+    Image = LOGO_ID,
     ScaleType = Enum.ScaleType.Fit,
     BackgroundTransparency = 1,
-    Position = UDim2.fromOffset(8, 0),
-    Size = UDim2.fromOffset(48, 48),
+    Position = UDim2.fromOffset(8, 4),
+    Size = UDim2.fromOffset(40, 40),
+    ImageTransparency = 0,
     ZIndex = 11
 }, top)
 
 local headerTitle = new("TextLabel", {
-    Name = "AlettaCreatorTitle",
-    Text = "ALETTA CREATOR",
-    Font = Enum.Font.GothamBlack,
-    TextSize = 16,
-    TextColor3 = TEXT,
-    BackgroundTransparency = 1,
-    Position = UDim2.fromOffset(62, 2),
-    Size = UDim2.fromOffset(230, 22),
-    TextXAlignment = Enum.TextXAlignment.Left,
-    ZIndex = 12
+    Name = "AlettaCreatorTitle", Text = "", BackgroundTransparency = 1, Visible = false, ZIndex = 12
 }, top)
-
 local headerSubtitle = new("TextLabel", {
-    Name = "AlettaCreatorSubtitle",
-    Text = "VIOLENCE DISTRICT",
-    Font = Enum.Font.GothamBold,
-    TextSize = 11,
-    TextColor3 = GRAY,
-    BackgroundTransparency = 1,
-    Position = UDim2.fromOffset(62, 25),
-    Size = UDim2.fromOffset(230, 18),
-    TextXAlignment = Enum.TextXAlignment.Left,
-    ZIndex = 12
+    Name = "AlettaCreatorSubtitle", Text = "", BackgroundTransparency = 1, Visible = false, ZIndex = 12
 }, top)
-
 local headerRightTitle = new("TextLabel", {
-    Name = "AlettaHeaderRightTitle",
-    Text = "AC SCRIPT",
-    Font = Enum.Font.GothamBlack,
-    TextSize = 13,
-    TextColor3 = TEXT,
-    BackgroundTransparency = 1,
-    Position = UDim2.new(1, -148, 0, 3),
-    Size = UDim2.fromOffset(108, 20),
-    TextXAlignment = Enum.TextXAlignment.Right,
-    ZIndex = 12
+    Name = "AlettaHeaderRightTitle", Text = "", BackgroundTransparency = 1, Visible = false, ZIndex = 12
 }, top)
-
 local headerRightSubtitle = new("TextLabel", {
-    Name = "AlettaHeaderRightSubtitle",
-    Text = "ALETTA CREATOR",
-    Font = Enum.Font.GothamBold,
-    TextSize = 9,
-    TextColor3 = GRAY,
-    BackgroundTransparency = 1,
-    Position = UDim2.new(1, -148, 0, 24),
-    Size = UDim2.fromOffset(108, 17),
-    TextXAlignment = Enum.TextXAlignment.Right,
-    ZIndex = 12
+    Name = "AlettaHeaderRightSubtitle", Text = "", BackgroundTransparency = 1, Visible = false, ZIndex = 12
 }, top)
 
 local minBtn = new("TextButton", {
@@ -808,7 +792,6 @@ local minBtn = new("TextButton", {
     Position = UDim2.new(1, -38, 0, 7)
 }, top)
 corner(minBtn, 6)
-
 local side = new("ScrollingFrame", {
     Position = UDim2.fromOffset(8, 48),
     Size = UDim2.fromOffset(150, 274),
@@ -1985,15 +1968,6 @@ Hooks["Auto Sprint Mobile"] = function(on)
     end
 end
 
-Hooks["Auto Skill Check Mode"] = function(mode)
-    Values["Auto Skill Check Mode"] = tostring(mode or "Legit")
-    -- Mode selection is stored for the game's legitimate skill-check
-    -- controller. No remote validation is bypassed here.
-end
-
-Hooks["Auto Skill Check"] = function(on)
-    Values["Auto Skill Check"] = on == true
-end
 
 Hooks["Custom FOV"] = function(on)
     camera = workspace.CurrentCamera or camera
@@ -2582,40 +2556,6 @@ end
 Hooks["Killer Prediction Mode"] = function(v) Values["Killer Prediction Mode"]=tostring(v or "Detected Role") end
 
 -- =========================================================
--- GENERATOR SKILL CHECK HELPER
--- =========================================================
-local function findSkillCheckButton()
-    local pg=playerGui
-    for _,obj in ipairs(pg:GetDescendants()) do
-        if obj:IsA("GuiButton") and obj.Visible then
-            local n=string.lower(obj.Name.." "..(obj:IsA("TextButton") and obj.Text or ""))
-            if n:find("skill") and (n:find("check") or n:find("hit") or n:find("perfect")) then return obj end
-        end
-    end
-    return nil
-end
-
-local function autoSkillCheckTick()
-    local b=findSkillCheckButton()
-    if b then
-        pcall(function() b:Activate() end)
-        return true
-    end
-    return false
-end
-
-Hooks["Auto Skill Check"] = function(on)
-    Values["Auto Skill Check"]=on==true
-    disconnectList("Auto Skill Check Loop")
-    if not on then return end
-    FeatureManager:Connect("Auto Skill Check Loop", RunService.RenderStepped, function()
-        autoSkillCheckTick()
-    end)
-end
-Hooks["Auto Skill Check Mode"] = function(v) Values["Auto Skill Check Mode"]=tostring(v or "Legit") end
-Hooks["Skill Check Speed"] = function(v) Values["Skill Check Speed"]=tonumber(v) or 14 end
-
--- =========================================================
 -- TOF SOUND SET
 -- =========================================================
 
@@ -2833,7 +2773,8 @@ local function applyConfigVisuals()
         bgDark.BackgroundColor3 = BG:Lerp(Color3.new(0,0,0), 0.65)
     end
 
-    -- Header and logo always follow the active theme.
+    -- Header bar uses the fixed Aletta bar asset; theme changes the rest of the GUI.
+    if headerBar then headerBar.Image = "rbxassetid://106783278057227" end
     if headerLogo then headerLogo.Image = (selectedTheme and selectedTheme.asset) or LOGO_ID end
     if icon then
         icon.Image = (selectedTheme and selectedTheme.asset) or LOGO_ID
@@ -4276,6 +4217,7 @@ do
         FIELD = t.main:Lerp(Color3.new(0,0,0), 0.25)
         BG = t.background
         if headerLogo then headerLogo.Image = t.asset end
+        if headerBar then headerBar.Image = "rbxassetid://106783278057227" end
         if icon then icon.Image = t.asset end
         if bgImg then bgImg.Image = t.asset end
     end

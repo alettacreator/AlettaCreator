@@ -68,7 +68,7 @@ local TEXT = Color3.fromRGB(255, 255, 255)
 
 -- Asset gambar tombol buka/tutup GUI.
 local BACKGROUND_ID = "rbxassetid://114593611204629"
-local LOGO_ID = "rbxassetid://94003702624009"
+local LOGO_ID = ""
 local HEADER_LOGO_ID = LOGO_ID
 local LOAD_SOUND_ID = "rbxassetid://83169454697282"
 local ICON_ID = LOGO_ID
@@ -732,41 +732,98 @@ local top = new("Frame", {
     ZIndex = 10
 }, window)
 
-local headerBar = new("ImageLabel", {
+-- Header bar: no image asset. Fully themeable.
+local headerBar = new("Frame", {
     Name = "AlettaHeaderBar",
-    Image = "rbxassetid://106783278057227",
-    ScaleType = Enum.ScaleType.Crop,
-    BackgroundTransparency = 1,
     Size = UDim2.fromScale(1, 1),
     Position = UDim2.fromScale(0, 0),
-    ImageTransparency = 0,
+    BackgroundColor3 = PANEL,
+    BackgroundTransparency = 0.12,
+    BorderSizePixel = 0,
     ZIndex = 10,
     Active = false
 }, top)
 corner(headerBar, 10)
 
+local headerStroke = new("UIStroke", {
+    Color = ACCENT,
+    Thickness = 1.5,
+    Transparency = 0.05
+}, headerBar)
+
+local headerACLeft = new("TextLabel", {
+    Name = "HeaderACLeft",
+    Text = "AC",
+    Font = Enum.Font.GothamBlack,
+    TextSize = 17,
+    TextColor3 = ACCENT,
+    TextStrokeTransparency = 0.5,
+    BackgroundTransparency = 1,
+    Position = UDim2.fromOffset(10, 0),
+    Size = UDim2.fromOffset(42, 48),
+    TextXAlignment = Enum.TextXAlignment.Center,
+    TextYAlignment = Enum.TextYAlignment.Center,
+    ZIndex = 12
+}, top)
+
+local headerLogo = new("TextLabel", {
+    Name = "AlettaHeaderNotice",
+    Text = "Aletta Script Free Fremium\nViolence District",
+    Font = Enum.Font.GothamBold,
+    TextSize = 12,
+    TextColor3 = TEXT,
+    TextWrapped = true,
+    BackgroundTransparency = 1,
+    AnchorPoint = Vector2.new(0.5, 0.5),
+    Position = UDim2.new(0.5, 0, 0.5, 0),
+    Size = UDim2.new(1, -116, 1, -4),
+    TextXAlignment = Enum.TextXAlignment.Center,
+    TextYAlignment = Enum.TextYAlignment.Center,
+    ZIndex = 12
+}, top)
+
+local headerWarning = new("TextLabel", {
+    Name = "AlettaHeaderWarning",
+    Text = "Tidak di Perjual Belikan • Jika ada Yang Menjual Berarti PENIPU !!!",
+    Font = Enum.Font.Gotham,
+    TextSize = 8,
+    TextScaled = true,
+    TextColor3 = TEXT,
+    TextTransparency = 0.08,
+    BackgroundTransparency = 1,
+    Position = UDim2.new(0, 58, 0, 33),
+    Size = UDim2.new(1, -150, 0, 12),
+    TextXAlignment = Enum.TextXAlignment.Center,
+    TextYAlignment = Enum.TextYAlignment.Center,
+    ZIndex = 12
+}, top)
+
+local headerACRight = new("TextLabel", {
+    Name = "HeaderACRight",
+    Text = "AC",
+    Font = Enum.Font.GothamBlack,
+    TextSize = 17,
+    TextColor3 = ACCENT,
+    TextStrokeTransparency = 0.5,
+    BackgroundTransparency = 1,
+    AnchorPoint = Vector2.new(1, 0),
+    Position = UDim2.new(1, -42, 0, 0),
+    Size = UDim2.fromOffset(42, 48),
+    TextXAlignment = Enum.TextXAlignment.Center,
+    TextYAlignment = Enum.TextYAlignment.Center,
+    ZIndex = 12
+}, top)
+
 local headerBarShade = new("Frame", {
     Name = "AlettaHeaderBarShade",
     Size = UDim2.fromScale(1, 1),
-    BackgroundColor3 = Color3.fromRGB(0, 0, 0),
-    BackgroundTransparency = 0.72,
+    BackgroundColor3 = Color3.new(0, 0, 0),
+    BackgroundTransparency = 0.82,
     BorderSizePixel = 0,
-    ZIndex = 10,
+    ZIndex = 11,
     Active = false
 }, top)
 corner(headerBarShade, 10)
-
--- Header image-only: no ALETTA CREATOR / VIOLENCE DISTRICT / AC SCRIPT text.
-local headerLogo = new("ImageLabel", {
-    Name = "AlettaHeaderLogo",
-    Image = LOGO_ID,
-    ScaleType = Enum.ScaleType.Fit,
-    BackgroundTransparency = 1,
-    Position = UDim2.fromOffset(8, 4),
-    Size = UDim2.fromOffset(40, 40),
-    ImageTransparency = 0,
-    ZIndex = 11
-}, top)
 
 local headerTitle = new("TextLabel", {
     Name = "AlettaCreatorTitle", Text = "", BackgroundTransparency = 1, Visible = false, ZIndex = 12
@@ -789,7 +846,8 @@ local minBtn = new("TextButton", {
     BackgroundColor3 = PANEL,
     BackgroundTransparency = 0.3,
     Size = UDim2.fromOffset(28, 26),
-    Position = UDim2.new(1, -38, 0, 7)
+    Position = UDim2.new(1, -38, 0, 7),
+    ZIndex = 14
 }, top)
 corner(minBtn, 6)
 local side = new("ScrollingFrame", {
@@ -2653,7 +2711,7 @@ local colorPresets = {
 }
 
 local themePresets = {
-    ["PURPLE"]  = {main=Color3.fromRGB(95,45,180),  accent=Color3.fromRGB(180,90,255),  outline=Color3.fromRGB(225,205,255), font=Color3.fromRGB(255,255,255), background=Color3.fromRGB(15,8,25), asset="rbxassetid://94003702624009"},
+    ["PURPLE"]  = {main=Color3.fromRGB(95,45,180),  accent=Color3.fromRGB(180,90,255),  outline=Color3.fromRGB(225,205,255), font=Color3.fromRGB(255,255,255), background=Color3.fromRGB(15,8,25), asset=""},
     ["PINK"]    = {main=Color3.fromRGB(145,45,105), accent=Color3.fromRGB(255,95,190),  outline=Color3.fromRGB(255,205,235), font=Color3.fromRGB(255,255,255), background=Color3.fromRGB(25,8,18), asset="rbxassetid://115489304339560"},
     ["YELLOW"]  = {main=Color3.fromRGB(145,105,25), accent=Color3.fromRGB(255,215,70),  outline=Color3.fromRGB(255,240,170), font=Color3.fromRGB(255,255,255), background=Color3.fromRGB(25,20,7), asset="rbxassetid://98915755062432"},
     ["GREEN"]   = {main=Color3.fromRGB(35,120,65),  accent=Color3.fromRGB(90,230,130),  outline=Color3.fromRGB(195,255,215), font=Color3.fromRGB(255,255,255), background=Color3.fromRGB(7,22,12), asset="rbxassetid://82044886382201"},
@@ -2717,10 +2775,10 @@ local function applyConfigVisuals()
     local selectedThemeName = Values["Theme List"] or "PURPLE"
     local selectedTheme = themePresets[selectedThemeName]
     if selectedTheme and selectedTheme.asset then
-        headerLogo.Image = selectedTheme.asset
+        -- header notice is text-only; no image asset
         icon.Image = selectedTheme.asset
     else
-        headerLogo.Image = LOGO_ID
+        -- header notice is text-only; no image asset
         icon.Image = LOGO_ID
     end
 
@@ -2731,6 +2789,50 @@ local function applyConfigVisuals()
             end
         end
     end
+
+    -- Repaint fixed/hard-coded GUI surfaces so theme changes are global.
+    for _, obj in ipairs(window:GetDescendants()) do
+        if obj:IsA("GuiObject") and obj.BackgroundTransparency < 1 then
+            local n = string.lower(obj.Name or "")
+            local isBackground = obj == bgImg or obj == bgDark or obj == headerBar or obj == headerBarShade
+            if not isBackground then
+                local c = obj.BackgroundColor3
+                local maxc = math.max(c.R, c.G, c.B)
+                local minc = math.min(c.R, c.G, c.B)
+                local sat = maxc > 0 and ((maxc - minc) / maxc) or 0
+                if obj:IsA("TextButton") or obj:IsA("ImageButton") then
+                    -- Controls use the theme panel by default; active states are recolored by their handlers.
+                    obj.BackgroundColor3 = PANEL
+                elseif obj:IsA("ScrollingFrame") then
+                    obj.BackgroundColor3 = PANEL
+                elseif obj:IsA("Frame") then
+                    -- Keep very bright accent-like surfaces as accents; dark neutral surfaces become themed panels.
+                    if sat > 0.30 and maxc > 0.35 then
+                        obj.BackgroundColor3 = ACCENT
+                    elseif maxc < 0.35 or sat < 0.18 then
+                        obj.BackgroundColor3 = FIELD
+                    else
+                        obj.BackgroundColor3 = PANEL
+                    end
+                end
+            end
+        end
+    end
+
+    -- Force every visible stroke/gradient in the GUI to follow the selected theme.
+    for _, obj in ipairs(window:GetDescendants()) do
+        if obj:IsA("UIStroke") then
+            obj.Color = outlineColor
+        elseif obj:IsA("UIGradient") and obj.Parent and obj.Parent:IsA("UIStroke") then
+            obj.Color = ColorSequence.new({
+                ColorSequenceKeypoint.new(0, outlineColor),
+                ColorSequenceKeypoint.new(0.5, accentColor),
+                ColorSequenceKeypoint.new(1, mainColor)
+            })
+        end
+    end
+    headerStroke.Color = outlineColor
+    wStroke.Color = outlineColor
 
     local face = fontMap[Values["Font Face"] or "Roboto"] or Enum.Font.Gotham
     for _, obj in ipairs(window:GetDescendants()) do
@@ -2766,20 +2868,24 @@ local function applyConfigVisuals()
         end
     end
 
-    -- Theme image is also the full GUI background.
-    if selectedTheme and selectedTheme.asset then
+    -- Theme background: use the theme asset when one exists; PURPLE uses a clean tinted fill.
+    if selectedTheme and selectedTheme.asset and selectedTheme.asset ~= "" then
         bgImg.Image = selectedTheme.asset
-        bgImg.ImageTransparency = 0.12
-        bgDark.BackgroundColor3 = BG:Lerp(Color3.new(0,0,0), 0.65)
+        bgImg.ImageTransparency = 0.16
+    else
+        bgImg.Image = ""
+        bgImg.ImageTransparency = 1
     end
+    bgDark.BackgroundColor3 = BG:Lerp(Color3.new(0,0,0), 0.58)
 
-    -- Header bar uses the fixed Aletta bar asset; theme changes the rest of the GUI.
-    if headerBar then headerBar.Image = "rbxassetid://106783278057227" end
-    if headerLogo then headerLogo.Image = (selectedTheme and selectedTheme.asset) or LOGO_ID end
-    if icon then
-        icon.Image = (selectedTheme and selectedTheme.asset) or LOGO_ID
-        icon.BackgroundColor3 = PANEL
-    end
+    -- Header follows the active theme completely.
+    headerBar.BackgroundColor3 = PANEL
+    headerStroke.Color = outlineColor
+    headerACLeft.TextColor3 = accentColor
+    headerACRight.TextColor3 = accentColor
+    headerLogo.TextColor3 = fontColor
+    headerWarning.TextColor3 = outlineColor:Lerp(fontColor, 0.35)
+    headerBarShade.BackgroundColor3 = BG:Lerp(Color3.new(0,0,0), 0.25)
 
     headerTitle.TextColor3 = fontColor
     headerSubtitle.TextColor3 = outlineColor:Lerp(fontColor, 0.25)
@@ -2860,9 +2966,8 @@ Hooks["Theme List"] = function(theme)
     FIELD = t.main:Lerp(Color3.new(0,0,0), 0.25)
     BG = t.background
 
-    if headerLogo then headerLogo.Image = t.asset end
-    if icon then icon.Image = t.asset end
-    if bgImg then bgImg.Image = t.asset end
+    if icon then icon.Image = t.asset or "" end
+    if bgImg then bgImg.Image = t.asset or "" end
 
     applyConfigVisuals()
 end
@@ -4216,10 +4321,8 @@ do
         PANEL = t.main:Lerp(Color3.new(0,0,0), 0.55)
         FIELD = t.main:Lerp(Color3.new(0,0,0), 0.25)
         BG = t.background
-        if headerLogo then headerLogo.Image = t.asset end
-        if headerBar then headerBar.Image = "rbxassetid://106783278057227" end
-        if icon then icon.Image = t.asset end
-        if bgImg then bgImg.Image = t.asset end
+        if icon then icon.Image = t.asset or "" end
+        if bgImg then bgImg.Image = t.asset or "" end
     end
 end
 

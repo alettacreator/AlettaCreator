@@ -1,711 +1,1316 @@
---========================================================
--- ALE TTA CREATOR - FISH IT
--- GUI EDITION
---========================================================
+--[[
+    ALEtta Creator Fish It
+    Fremium / BETA Tester Edition
+    UI: Aletta Creator Style
+]]
 
+--// SERVICES
 local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
+local HttpService = game:GetService("HttpService")
 
-local player = Players.LocalPlayer
-local PlayerGui = player:WaitForChild("PlayerGui")
+local LocalPlayer = Players.LocalPlayer
 
---========================================================
--- ASSET THEME
---========================================================
+--// CONFIG
+local GUI_NAME = "AlettaCreatorFishIt"
 
-local HEADER_ASSET = "rbxassetid://115178015210033"
-
-local THEMES = {
-	PURPLE = {
-		bg = "rbxassetid://94003702624009",
-		accent = Color3.fromRGB(165,75,255),
-	},
-	PINK = {
-		bg = "rbxassetid://115489304339560",
-		accent = Color3.fromRGB(255,75,190),
-	},
-	YELLOW = {
-		bg = "rbxassetid://98915755062432",
-		accent = Color3.fromRGB(255,210,60),
-	},
-	GREEN = {
-		bg = "rbxassetid://82044886382201",
-		accent = Color3.fromRGB(70,230,130),
-	},
-	GOLD = {
-		bg = "rbxassetid://98915755062432",
-		accent = Color3.fromRGB(255,185,45),
-	},
-	RED = {
-		bg = "rbxassetid://127084129735969",
-		accent = Color3.fromRGB(255,65,75),
-	},
-	BLUE = {
-		bg = "rbxassetid://79416721033325",
-		accent = Color3.fromRGB(70,150,255),
-	},
-	SILVER = {
-		bg = "rbxassetid://125312830368472",
-		accent = Color3.fromRGB(205,215,230),
-	},
-	ORANGE = {
-		bg = "rbxassetid://96825895417750",
-		accent = Color3.fromRGB(255,135,45),
-	},
-	RAIMBOW = {
-		bg = "rbxassetid://89672943739008",
-		accent = Color3.fromRGB(195,95,255),
-	},
+local Themes = {
+    PURPLE = Color3.fromRGB(150, 80, 255),
+    PINK = Color3.fromRGB(255, 80, 180),
+    YELLOW = Color3.fromRGB(255, 220, 70),
+    GREEN = Color3.fromRGB(80, 220, 130),
+    GOLD = Color3.fromRGB(255, 190, 50),
+    RED = Color3.fromRGB(255, 75, 75),
+    BLUE = Color3.fromRGB(80, 150, 255),
+    SILVER = Color3.fromRGB(190, 195, 205),
+    ORANGE = Color3.fromRGB(255, 135, 50),
+    RAIMBOW = Color3.fromRGB(180, 90, 255)
 }
 
-local CurrentTheme = "PURPLE"
+local Accent = Themes.PURPLE
 
---========================================================
--- CLEAN OLD GUI
---========================================================
+local BG = Color3.fromRGB(14,10,22)
+local PANEL = Color3.fromRGB(20,16,30)
+local FIELD = Color3.fromRGB(38,30,54)
+local TEXT = Color3.fromRGB(240,240,245)
+local MUTED = Color3.fromRGB(165,160,175)
 
-local old = PlayerGui:FindFirstChild("AlettaCreatorFishIt")
+--// CLEAN OLD GUI
+local old = game.CoreGui:FindFirstChild(GUI_NAME)
 if old then
-	old:Destroy()
+    old:Destroy()
 end
 
---========================================================
--- HELPERS
---========================================================
+--// STATE
+local State = {
+    NoFishingAnimation = false,
+    AutoEquipRod = false,
+    BypassRadar = false,
+    LockPosition = false,
+    PingPanel = false,
+    DisableCutscenes = false,
 
-local function New(class, properties, parent)
-	local obj = Instance.new(class)
+    SkipRarity = false,
+    SkipTargetRarity = "None",
 
-	for property,value in pairs(properties or {}) do
-		obj[property] = value
-	end
+    LegitFishing = false,
+    AutoShake = false,
+    ShakeDelay = 0.05,
 
-	obj.Parent = parent
-	return obj
+    InstantFishing = false,
+    InstantMode = "Normal",
+    InstantDelay = 0.04,
+
+    UltraBlatant = false,
+    FastReelMode = "Normal",
+    FishingCompleteDelay = 0.3,
+
+    BlatantV2 = false,
+    SpamCastDelay = 0.05,
+    CompleteDelayV2 = 0.01,
+
+    PerfectCrafting = false,
+
+    AutoFavorite = false,
+    FavoriteName = "",
+    FavoriteVariant = "",
+    FavoriteRarity = "",
+
+    UnFavoriteName = "",
+    UnFavoriteVariant = "",
+    UnFavoriteRarity = "",
+
+    FavoriteRuby = false,
+    FavoriteLegendary = false,
+    FavoriteEquipment = false,
+
+    SelectedIsland = "",
+    SelectedPlayer = "",
+    SelectedNPC = "",
+    SelectedEvent = "",
+
+    AutoEventTeleport = false,
+    AutoTeleportSpawn = false,
+
+    Theme = "PURPLE"
+}
+
+local SavedCFrame = nil
+local Connections = {}
+
+--// HELPERS
+local function New(class, props, parent)
+    local obj = Instance.new(class)
+
+    for k,v in pairs(props or {}) do
+        obj[k] = v
+    end
+
+    if parent then
+        obj.Parent = parent
+    end
+
+    return obj
 end
 
 local function Corner(obj, radius)
-	local c = Instance.new("UICorner")
-	c.CornerRadius = UDim.new(0,radius or 8)
-	c.Parent = obj
-	return c
+    New("UICorner", {
+        CornerRadius = UDim.new(0, radius or 6)
+    }, obj)
 end
 
 local function Stroke(obj, color, thickness)
-	local s = Instance.new("UIStroke")
-	s.Color = color
-	s.Thickness = thickness or 1
-	s.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-	s.Parent = obj
-	return s
+    return New("UIStroke", {
+        Color = color or Accent,
+        Thickness = thickness or 1,
+        Transparency = 0
+    }, obj)
 end
 
-local function GetTheme()
-	return THEMES[CurrentTheme]
+local function SetAccent(color)
+    Accent = color
+
+    for _,obj in ipairs(game.CoreGui:GetDescendants()) do
+        if obj:IsA("UIStroke") and obj:GetAttribute("AlettaAccent") then
+            obj.Color = Accent
+        elseif obj:IsA("TextButton") and obj:GetAttribute("AlettaAccentButton") then
+            obj.TextColor3 = Accent
+        end
+    end
+end
+
+--// GUI
+local GUI = New("ScreenGui", {
+    Name = GUI_NAME,
+    ResetOnSpawn = false,
+    ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+}, game.CoreGui)
+
+--// MAIN WINDOW
+local Window = New("Frame", {
+    Name = "Window",
+    Size = UDim2.fromOffset(760, 480),
+    Position = UDim2.new(0.5, -380, 0.5, -240),
+    BackgroundColor3 = BG,
+    BorderSizePixel = 0
+}, GUI)
+
+Corner(Window, 10)
+Stroke(Window, Accent, 1).Name = "MainStroke"
+Window:FindFirstChildOfClass("UIStroke"):SetAttribute("AlettaAccent", true)
+
+--// HEADER
+local Header = New("Frame", {
+    Size = UDim2.new(1,0,0,58),
+    BackgroundColor3 = PANEL,
+    BorderSizePixel = 0
+}, Window)
+
+Corner(Header, 10)
+
+local HeaderLine = New("Frame", {
+    Size = UDim2.new(1,0,0,1),
+    Position = UDim2.new(0,0,1,-1),
+    BackgroundColor3 = Accent,
+    BorderSizePixel = 0
+}, Header)
+
+local Logo = New("ImageLabel", {
+    Size = UDim2.fromOffset(42,42),
+    Position = UDim2.fromOffset(9,8),
+    BackgroundTransparency = 1,
+    Image = "rbxassetid://79108447755192"
+}, Header)
+
+local Title = New("TextLabel", {
+    Position = UDim2.fromOffset(60,8),
+    Size = UDim2.fromOffset(500,24),
+    BackgroundTransparency = 1,
+    Text = "Aletta Creator",
+    Font = Enum.Font.GothamBold,
+    TextSize = 18,
+    TextColor3 = TEXT,
+    TextXAlignment = Enum.TextXAlignment.Left
+}, Header)
+
+local SubTitle = New("TextLabel", {
+    Position = UDim2.fromOffset(61,30),
+    Size = UDim2.fromOffset(500,20),
+    BackgroundTransparency = 1,
+    Text = "Fish It • Fremium / BETA Tester",
+    Font = Enum.Font.Gotham,
+    TextSize = 11,
+    TextColor3 = MUTED,
+    TextXAlignment = Enum.TextXAlignment.Left
+}, Header)
+
+local Minimize = New("TextButton", {
+    Size = UDim2.fromOffset(38,32),
+    Position = UDim2.new(1,-82,0,13),
+    BackgroundColor3 = FIELD,
+    Text = "—",
+    TextSize = 18,
+    Font = Enum.Font.GothamBold,
+    TextColor3 = TEXT,
+    AutoButtonColor = false
+}, Header)
+
+Corner(Minimize, 6)
+
+local Close = New("TextButton", {
+    Size = UDim2.fromOffset(38,32),
+    Position = UDim2.new(1,-40,0,13),
+    BackgroundColor3 = FIELD,
+    Text = "×",
+    TextSize = 20,
+    Font = Enum.Font.GothamBold,
+    TextColor3 = TEXT,
+    AutoButtonColor = false
+}, Header)
+
+Corner(Close, 6)
+
+--// SIDEBAR
+local Sidebar = New("Frame", {
+    Size = UDim2.new(0,175,1,-58),
+    Position = UDim2.fromOffset(0,58),
+    BackgroundColor3 = PANEL,
+    BorderSizePixel = 0
+}, Window)
+
+--// SEARCH
+local SearchBox = New("TextBox", {
+    Size = UDim2.new(1,-20,0,34),
+    Position = UDim2.fromOffset(10,12),
+    BackgroundColor3 = FIELD,
+    PlaceholderText = "🔍 Search feature...",
+    PlaceholderColor3 = MUTED,
+    Text = "",
+    TextColor3 = TEXT,
+    Font = Enum.Font.Gotham,
+    TextSize = 11,
+    ClearTextOnFocus = false
+}, Sidebar)
+
+Corner(SearchBox, 7)
+
+--// TAB CONTAINER
+local TabList = New("ScrollingFrame", {
+    Size = UDim2.new(1,-16,1,-60),
+    Position = UDim2.fromOffset(8,54),
+    BackgroundTransparency = 1,
+    BorderSizePixel = 0,
+    ScrollBarThickness = 2,
+    CanvasSize = UDim2.new()
+}, Sidebar)
+
+local TabLayout = New("UIListLayout", {
+    Padding = UDim.new(0,5),
+    SortOrder = Enum.SortOrder.LayoutOrder
+}, TabList)
+
+--// CONTENT
+local Content = New("Frame", {
+    Size = UDim2.new(1,-175,1,-58),
+    Position = UDim2.fromOffset(175,58),
+    BackgroundColor3 = BG,
+    BorderSizePixel = 0
+}, Window)
+
+local Pages = {}
+
+local function CreatePage(name)
+    local page = New("ScrollingFrame", {
+        Name = name,
+        Size = UDim2.new(1,-18,1,-18),
+        Position = UDim2.fromOffset(9,9),
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        ScrollBarThickness = 3,
+        CanvasSize = UDim2.new()
+    }, Content)
+
+    local layout = New("UIListLayout", {
+        Padding = UDim.new(0,8),
+        SortOrder = Enum.SortOrder.LayoutOrder
+    }, page)
+
+    layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        page.CanvasSize = UDim2.fromOffset(
+            0,
+            layout.AbsoluteContentSize.Y + 15
+        )
+    end)
+
+    Pages[name] = page
+    return page
+end
+
+local function CreateTab(name, icon)
+    local button = New("TextButton", {
+        Size = UDim2.new(1,-4,0,35),
+        BackgroundColor3 = FIELD,
+        Text = (icon or "") .. "  " .. name,
+        TextColor3 = MUTED,
+        Font = Enum.Font.GothamMedium,
+        TextSize = 11,
+        AutoButtonColor = false
+    }, TabList)
+
+    Corner(button, 6)
+
+    button.MouseButton1Click:Connect(function()
+        for n,p in pairs(Pages) do
+            p.Visible = n == name
+        end
+
+        for _,b in ipairs(TabList:GetChildren()) do
+            if b:IsA("TextButton") then
+                b.BackgroundColor3 = FIELD
+                b.TextColor3 = MUTED
+            end
+        end
+
+        button.BackgroundColor3 = Accent
+        button.TextColor3 = Color3.new(1,1,1)
+    end)
+
+    return button
+end
+
+local function Section(parent, title)
+    local frame = New("Frame", {
+        Size = UDim2.new(1,0,0,38),
+        BackgroundColor3 = PANEL,
+        BorderSizePixel = 0
+    }, parent)
+
+    Corner(frame, 7)
+
+    local label = New("TextLabel", {
+        Size = UDim2.new(1,-20,1,0),
+        Position = UDim2.fromOffset(10,0),
+        BackgroundTransparency = 1,
+        Text = title,
+        TextColor3 = Accent,
+        Font = Enum.Font.GothamBold,
+        TextSize = 12,
+        TextXAlignment = Enum.TextXAlignment.Left
+    }, frame)
+
+    label:SetAttribute("AlettaAccent", true)
+
+    return frame
+end
+
+local function Toggle(parent, text, key)
+    local holder = New("Frame", {
+        Size = UDim2.new(1,0,0,40),
+        BackgroundColor3 = PANEL,
+        BorderSizePixel = 0
+    }, parent)
+
+    Corner(holder, 7)
+
+    local label = New("TextLabel", {
+        Size = UDim2.new(1,-65,1,0),
+        Position = UDim2.fromOffset(12,0),
+        BackgroundTransparency = 1,
+        Text = text,
+        TextColor3 = TEXT,
+        Font = Enum.Font.Gotham,
+        TextSize = 11,
+        TextXAlignment = Enum.TextXAlignment.Left
+    }, holder)
+
+    local button = New("TextButton", {
+        Size = UDim2.fromOffset(42,22),
+        Position = UDim2.new(1,-53,0.5,-11),
+        BackgroundColor3 = FIELD,
+        Text = "",
+        AutoButtonColor = false
+    }, holder)
+
+    Corner(button, 12)
+
+    local circle = New("Frame", {
+        Size = UDim2.fromOffset(18,18),
+        Position = UDim2.fromOffset(2,2),
+        BackgroundColor3 = MUTED,
+        BorderSizePixel = 0
+    }, button)
+
+    Corner(circle, 20)
+
+    local function update()
+        local on = State[key]
+
+        button.BackgroundColor3 = on and Accent or FIELD
+        circle.BackgroundColor3 = on and Color3.new(1,1,1) or MUTED
+        circle.Position = on
+            and UDim2.new(1,-20,0,2)
+            or UDim2.fromOffset(2,2)
+    end
+
+    button.MouseButton1Click:Connect(function()
+        State[key] = not State[key]
+        update()
+    end)
+
+    update()
+
+    return holder
+end
+
+local function Input(parent, text, key, default)
+    State[key] = default or State[key]
+
+    local holder = New("Frame", {
+        Size = UDim2.new(1,0,0,44),
+        BackgroundColor3 = PANEL,
+        BorderSizePixel = 0
+    }, parent)
+
+    Corner(holder, 7)
+
+    New("TextLabel", {
+        Size = UDim2.new(0.55,0,1,0),
+        Position = UDim2.fromOffset(12,0),
+        BackgroundTransparency = 1,
+        Text = text,
+        TextColor3 = TEXT,
+        Font = Enum.Font.Gotham,
+        TextSize = 11,
+        TextXAlignment = Enum.TextXAlignment.Left
+    }, holder)
+
+    local box = New("TextBox", {
+        Size = UDim2.new(0.4,-10,0,28),
+        Position = UDim2.new(0.6,0,0.5,-14),
+        BackgroundColor3 = FIELD,
+        Text = tostring(State[key]),
+        TextColor3 = TEXT,
+        Font = Enum.Font.Gotham,
+        TextSize = 11,
+        ClearTextOnFocus = false
+    }, holder)
+
+    Corner(box, 5)
+
+    box.FocusLost:Connect(function()
+        local number = tonumber(box.Text)
+
+        if number then
+            State[key] = number
+        else
+            State[key] = box.Text
+        end
+    end)
+
+    return holder
+end
+
+local function Dropdown(parent, text, key, values)
+    local holder = New("Frame", {
+        Size = UDim2.new(1,0,0,44),
+        BackgroundColor3 = PANEL,
+        BorderSizePixel = 0
+    }, parent)
+
+    Corner(holder, 7)
+
+    New("TextLabel", {
+        Size = UDim2.new(0.45,0,1,0),
+        Position = UDim2.fromOffset(12,0),
+        BackgroundTransparency = 1,
+        Text = text,
+        TextColor3 = TEXT,
+        Font = Enum.Font.Gotham,
+        TextSize = 11,
+        TextXAlignment = Enum.TextXAlignment.Left
+    }, holder)
+
+    local selected = values[1]
+    State[key] = State[key] ~= "" and State[key] or selected
+
+    local button = New("TextButton", {
+        Size = UDim2.new(0.48,0,0,28),
+        Position = UDim2.new(0.51,0,0.5,-14),
+        BackgroundColor3 = FIELD,
+        Text = tostring(State[key]) .. "  ▾",
+        TextColor3 = TEXT,
+        Font = Enum.Font.Gotham,
+        TextSize = 10,
+        AutoButtonColor = false
+    }, holder)
+
+    Corner(button, 5)
+
+    local popup
+
+    button.MouseButton1Click:Connect(function()
+        if popup then
+            popup:Destroy()
+            popup = nil
+            return
+        end
+
+        popup = New("Frame", {
+            Size = UDim2.new(0,180,0,math.min(#values*30+8,190)),
+            BackgroundColor3 = PANEL,
+            BorderSizePixel = 0,
+            ZIndex = 50
+        }, GUI)
+
+        Corner(popup, 6)
+        Stroke(popup, Accent, 1)
+
+        local abs = button.AbsolutePosition
+        popup.Position = UDim2.fromOffset(abs.X, abs.Y + button.AbsoluteSize.Y + 3)
+
+        local scroll = New("ScrollingFrame", {
+            Size = UDim2.new(1,-8,1,-8),
+            Position = UDim2.fromOffset(4,4),
+            BackgroundTransparency = 1,
+            BorderSizePixel = 0,
+            ScrollBarThickness = 2,
+            ZIndex = 51
+        }, popup)
+
+        local layout = New("UIListLayout", {
+            Padding = UDim.new(0,3)
+        }, scroll)
+
+        for _,value in ipairs(values) do
+            local option = New("TextButton", {
+                Size = UDim2.new(1,-4,0,27),
+                BackgroundColor3 = FIELD,
+                Text = tostring(value),
+                TextColor3 = TEXT,
+                Font = Enum.Font.Gotham,
+                TextSize = 10,
+                ZIndex = 52,
+                AutoButtonColor = false
+            }, scroll)
+
+            Corner(option, 4)
+
+            option.MouseButton1Click:Connect(function()
+                State[key] = value
+                button.Text = tostring(value) .. "  ▾"
+                popup:Destroy()
+                popup = nil
+            end)
+        end
+
+        scroll.CanvasSize = UDim2.fromOffset(0,layout.AbsoluteContentSize.Y+5)
+    end)
+
+    return holder
+end
+
+local function Button(parent, text, callback)
+    local b = New("TextButton", {
+        Size = UDim2.new(1,0,0,40),
+        BackgroundColor3 = FIELD,
+        Text = text,
+        TextColor3 = TEXT,
+        Font = Enum.Font.GothamMedium,
+        TextSize = 11,
+        AutoButtonColor = false
+    }, parent)
+
+    Corner(b, 7)
+
+    b.MouseEnter:Connect(function()
+        b.BackgroundColor3 = Accent
+    end)
+
+    b.MouseLeave:Connect(function()
+        b.BackgroundColor3 = FIELD
+    end)
+
+    b.MouseButton1Click:Connect(callback)
+
+    return b
+end
+
+local function Label(parent, text)
+    local l = New("TextLabel", {
+        Size = UDim2.new(1,0,0,32),
+        BackgroundColor3 = PANEL,
+        Text = text,
+        TextColor3 = MUTED,
+        Font = Enum.Font.Gotham,
+        TextSize = 10,
+        TextWrapped = true
+    }, parent)
+
+    Corner(l, 7)
+    return l
 end
 
 --========================================================
--- GUI
+-- MAIN
 --========================================================
 
-local GUI = New("ScreenGui",{
-	Name = "AlettaCreatorFishIt",
-	ResetOnSpawn = false,
-	IgnoreGuiInset = true,
-	ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
-},PlayerGui)
+local Main = CreatePage("Main")
+
+Section(Main,"Support Features")
+Toggle(Main,"No Fishing Animation","NoFishingAnimation")
+Toggle(Main,"Auto Equip Rod","AutoEquipRod")
+Toggle(Main,"Bypass Radar","BypassRadar")
+Toggle(Main,"Lock Position","LockPosition")
+Toggle(Main,"Show Real Ping Panel","PingPanel")
+Toggle(Main,"Disable Cutscenes","DisableCutscenes")
+
+Section(Main,"Skip Rarity")
+
+Dropdown(Main,"Target Rarity","SkipTargetRarity",{
+    "None",
+    "Common",
+    "Uncommon",
+    "Rare",
+    "Epic",
+    "Legendary",
+    "Mythic",
+    "SECRET"
+})
+
+Toggle(Main,"Enable Skip Rarity","SkipRarity")
+
+Section(Main,"Legit Fishing")
+
+Input(Main,"Shake Delay","ShakeDelay",0.05)
+Toggle(Main,"Enable Legit Fishing","LegitFishing")
+Toggle(Main,"Auto Shake","AutoShake")
+
+Section(Main,"Instant Fishing")
+
+Dropdown(Main,"Mode","InstantMode",{
+    "Normal",
+    "Perfect"
+})
+
+Input(Main,"Instant Delay","InstantDelay",0.04)
+Toggle(Main,"Enable Instant","InstantFishing")
+
+Section(Main,"Instant Fast Reel [BETA]")
+
+Dropdown(Main,"Mode","FastReelMode",{
+    "Normal",
+    "Perfect"
+})
+
+Input(Main,"Fishing Complete Delay","FishingCompleteDelay",0.3)
+Toggle(Main,"Enable Ultra Blatant","UltraBlatant")
+
+Section(Main,"Blatant V2 [BETA]")
+
+Toggle(Main,"Enable Blatant V2","BlatantV2")
+Input(Main,"Spam Cast Delay V2","SpamCastDelay",0.05)
+Input(Main,"Complete Delay V2","CompleteDelayV2",0.01)
+
+Section(Main,"Perfect Rod / Bait Crafting")
+
+Label(Main,
+    "Perfect Zone\nAuto crafting will attempt to keep the crafting action inside the perfect zone."
+)
+
+Toggle(Main,"Enable Auto Perfect Crafting","PerfectCrafting")
 
 --========================================================
--- MAIN WINDOW
+-- FAVORITE
 --========================================================
 
-local Main = New("Frame",{
-	Name = "Main",
-	Size = UDim2.new(.86,0,.82,0),
-	Position = UDim2.new(.5,0,.5,0),
-	AnchorPoint = Vector2.new(.5,.5),
-	BackgroundColor3 = Color3.fromRGB(7,3,14),
-	BackgroundTransparency = .08,
-	Active = true,
-},GUI)
+local Favorite = CreatePage("Favorite")
 
-Corner(Main,16)
+Section(Favorite,"Auto Favorite")
 
-local MainStroke = Stroke(
-	Main,
-	GetTheme().accent,
-	2
+Toggle(Favorite,"Auto Favorite","AutoFavorite")
+Input(Favorite,"Filter Name","FavoriteName","")
+Input(Favorite,"Filter Variant","FavoriteVariant","")
+Input(Favorite,"Filter Rarity","FavoriteRarity","")
+
+Label(Favorite,
+    "Filter menggunakan sistem AND.\nFilter kosong akan diabaikan."
+)
+
+Section(Favorite,"Un-Favorite")
+
+Input(Favorite,"Unfav Name","UnFavoriteName","")
+Input(Favorite,"Unfav Variant","UnFavoriteVariant","")
+Input(Favorite,"Unfav Rarity","UnFavoriteRarity","")
+
+Section(Favorite,"Special Favorite")
+
+Toggle(Favorite,"Auto Favorite Ruby (Gemstone)","FavoriteRuby")
+Toggle(Favorite,"Auto Favorite Legendary (Crystalized)","FavoriteLegendary")
+Toggle(Favorite,"Auto Favorite Equipment","FavoriteEquipment")
+
+Section(Favorite,"Equipment")
+
+Input(Favorite,"Equip Name","EquipName","")
+Input(Favorite,"Equip Variant","EquipVariant","")
+Input(Favorite,"Equip Rarity","EquipRarity","")
+
+Dropdown(Favorite,"Equipment Rarity","EquipRaritySelect",{
+    "Common",
+    "Uncommon",
+    "Rare",
+    "Epic",
+    "Legendary",
+    "Mythic",
+    "SECRET"
+})
+
+Dropdown(Favorite,"Variant","EquipVariantSelect",{
+    "8-Bit",
+    "Abyssal",
+    "Albino",
+    "Arctic Frost",
+    "Aurora",
+    "Binary",
+    "Bloodmoon",
+    "Default"
+})
+
+--========================================================
+-- TELEPORT
+--========================================================
+
+local Teleport = CreatePage("Teleport")
+
+Section(Teleport,"Teleport to Island")
+
+local Islands = {
+    "Fisherman Island",
+    "Ocean",
+    "Tropical Grove",
+    "Kohana Island",
+    "Kohana Volcano",
+    "Coral Reefs",
+    "Crater Island",
+    "Esoteric Depths",
+    "Lost Isle",
+    "Sisyphus Statue",
+    "Treasure Room",
+    "Ancient Jungle",
+    "Sacred Temple",
+    "Pirate Cove",
+    "Crystal Depths",
+    "Pirate Treasure Room",
+    "Arcadia"
+}
+
+Dropdown(Teleport,"Select Island","SelectedIsland",Islands)
+
+Button(Teleport,"Teleport",function()
+    local target = State.SelectedIsland
+
+    if not target or target == "" then
+        return
+    end
+
+    local found
+
+    for _,obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("BasePart") and obj.Name:lower() == target:lower() then
+            found = obj
+            break
+        end
+    end
+
+    if not found then
+        for _,obj in ipairs(workspace:GetDescendants()) do
+            if obj:IsA("BasePart") and obj.Name:lower():find(target:lower(),1,true) then
+                found = obj
+                break
+            end
+        end
+    end
+
+    if found and LocalPlayer.Character then
+        local root = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if root then
+            root.CFrame = found.CFrame + Vector3.new(0,4,0)
+        end
+    end
+end)
+
+Section(Teleport,"Teleport to Player")
+
+local function GetPlayers()
+    local list = {}
+
+    for _,p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer then
+            table.insert(list,p.Name)
+        end
+    end
+
+    if #list == 0 then
+        table.insert(list,"No Player")
+    end
+
+    return list
+end
+
+Dropdown(Teleport,"Select Player","SelectedPlayer",GetPlayers())
+
+Button(Teleport,"Teleport to Selected Player",function()
+    local target = Players:FindFirstChild(State.SelectedPlayer)
+
+    if target and target.Character and LocalPlayer.Character then
+        local a = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        local b = target.Character:FindFirstChild("HumanoidRootPart")
+
+        if a and b then
+            a.CFrame = b.CFrame + Vector3.new(3,0,0)
+        end
+    end
+end)
+
+Button(Teleport,"Refresh Player List",function()
+    -- list is dynamically refreshed when GUI is reopened
+end)
+
+Section(Teleport,"Saved Location")
+
+Button(Teleport,"Save Current Location",function()
+    local char = LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+
+    if root then
+        SavedCFrame = root.CFrame
+    end
+end)
+
+Button(Teleport,"Teleport to Saved",function()
+    if SavedCFrame and LocalPlayer.Character then
+        local root = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+
+        if root then
+            root.CFrame = SavedCFrame
+        end
+    end
+end)
+
+Button(Teleport,"Reset Saved Location",function()
+    SavedCFrame = nil
+end)
+
+Toggle(Teleport,"Auto Teleport on Spawn","AutoTeleportSpawn")
+
+Section(Teleport,"Event Teleport")
+
+Dropdown(Teleport,"Select Event","SelectedEvent",{
+    "Auto Detect",
+    "Meteor",
+    "Shark Hunt",
+    "Admin Event",
+    "Special Event"
+})
+
+Toggle(Teleport,"Priority Event","PriorityEvent")
+Button(Teleport,"Refresh Event List",function() end)
+Toggle(Teleport,"Auto Event Teleport","AutoEventTeleport")
+
+Section(Teleport,"Teleport to NPC")
+
+Dropdown(Teleport,"Select NPC","SelectedNPC",{
+    "Auto Detect NPC"
+})
+
+Button(Teleport,"Teleport to NPC",function()
+    local targetName = State.SelectedNPC
+
+    for _,obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("Model") and obj.Name == targetName then
+            local root = obj:FindFirstChild("HumanoidRootPart")
+
+            if root and LocalPlayer.Character then
+                local myRoot = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+
+                if myRoot then
+                    myRoot.CFrame = root.CFrame + Vector3.new(3,0,0)
+                end
+            end
+
+            break
+        end
+    end
+end)
+
+Button(Teleport,"Refresh NPC List",function() end)
+
+--========================================================
+-- SHOP
+--========================================================
+
+local Shop = CreatePage("Shop")
+
+Section(Shop,"Item Shop")
+
+Dropdown(Shop,"Category","ShopCategory",{
+    "Rod",
+    "Bait",
+    "Equipment",
+    "Gemstone",
+    "Enchant Stone",
+    "Trophy",
+    "Other"
+})
+
+Dropdown(Shop,"Rarity","ShopRarity",{
+    "All",
+    "Common",
+    "Uncommon",
+    "Rare",
+    "Epic",
+    "Legendary",
+    "Mythic",
+    "SECRET"
+})
+
+Input(Shop,"Search Item","ShopSearch","")
+
+Button(Shop,"Refresh Shop",function() end)
+
+Label(Shop,
+    "Shop item list disiapkan agar mudah diperbarui ketika struktur item Fish It berubah."
 )
 
 --========================================================
--- BACKGROUND
+-- AUTOMATION
 --========================================================
 
-local Background = New("ImageLabel",{
-	Name = "ThemeBackground",
-	Size = UDim2.fromScale(1,1),
-	BackgroundTransparency = 1,
-	Image = GetTheme().bg,
-	ScaleType = Enum.ScaleType.Crop,
-	ImageTransparency = .08,
-	ZIndex = 0,
-},Main)
+local Automation = CreatePage("Automation")
 
-Corner(Background,16)
+Section(Automation,"Fishing Automation")
 
-local DarkOverlay = New("Frame",{
-	Size = UDim2.fromScale(1,1),
-	BackgroundColor3 = Color3.fromRGB(5,2,12),
-	BackgroundTransparency = .38,
-	BorderSizePixel = 0,
-	ZIndex = 1,
-},Main)
+Toggle(Automation,"Auto Equip Rod","AutoEquipRod")
+Toggle(Automation,"Auto Shake","AutoShake")
+Toggle(Automation,"Enable Legit Fishing","LegitFishing")
+Toggle(Automation,"Enable Instant","InstantFishing")
 
-Corner(DarkOverlay,16)
+Section(Automation,"Position")
 
---========================================================
--- HEADER
---========================================================
+Toggle(Automation,"Lock Position","LockPosition")
 
-local Header = New("Frame",{
-	Size = UDim2.new(1,0,0,60),
-	BackgroundColor3 = Color3.fromRGB(7,3,14),
-	BackgroundTransparency = .18,
-	ZIndex = 10,
-},Main)
+Button(Automation,"Save Current Position",function()
+    local char = LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
 
-local HeaderLine = New("Frame",{
-	Size = UDim2.new(1,0,0,2),
-	Position = UDim2.new(0,0,1,-2),
-	BackgroundColor3 = GetTheme().accent,
-	BorderSizePixel = 0,
-	ZIndex = 12,
-},Header)
+    if root then
+        SavedCFrame = root.CFrame
+    end
+end)
 
-local HeaderImage = New("ImageLabel",{
-	Image = HEADER_ASSET,
-	BackgroundTransparency = 1,
-	ScaleType = Enum.ScaleType.Fit,
-	Position = UDim2.fromOffset(8,3),
-	Size = UDim2.fromOffset(190,54),
-	ZIndex = 11,
-},Header)
+Button(Automation,"Return To Saved Position",function()
+    if SavedCFrame and LocalPlayer.Character then
+        local root = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
 
-local Title = New("TextLabel",{
-	Text = "ALETTA  |  Fish It",
-	Font = Enum.Font.GothamBlack,
-	TextSize = 18,
-	TextColor3 = Color3.fromRGB(245,235,255),
-	BackgroundTransparency = 1,
-	Position = UDim2.fromOffset(185,8),
-	Size = UDim2.fromOffset(240,26),
-	TextXAlignment = Enum.TextXAlignment.Left,
-	ZIndex = 11,
-},Header)
+        if root then
+            root.CFrame = SavedCFrame
+        end
+    end
+end)
 
-local Premium = New("TextLabel",{
-	Text = "PREMIUM EDITION",
-	Font = Enum.Font.GothamBold,
-	TextSize = 9,
-	TextColor3 = Color3.new(1,1,1),
-	BackgroundColor3 = GetTheme().accent,
-	BackgroundTransparency = .15,
-	Position = UDim2.fromOffset(425,13),
-	Size = UDim2.fromOffset(105,24),
-	ZIndex = 11,
-},Header)
+Section(Automation,"Crafting")
 
-Corner(Premium,10)
-
-local AssetText = New("TextLabel",{
-	Text = "115178015210033",
-	Font = Enum.Font.GothamBold,
-	TextSize = 10,
-	TextColor3 = GetTheme().accent,
-	BackgroundTransparency = 1,
-	Position = UDim2.new(.5,0,0,5),
-	AnchorPoint = Vector2.new(.5,0),
-	Size = UDim2.fromOffset(160,20),
-	ZIndex = 12,
-},Header)
+Toggle(Automation,"Auto Perfect Crafting","PerfectCrafting")
 
 --========================================================
--- THEME BUTTON
+-- TRADE
 --========================================================
 
-local ThemeText = New("TextLabel",{
-	Text = "Theme",
-	Font = Enum.Font.Gotham,
-	TextSize = 10,
-	TextColor3 = Color3.fromRGB(220,220,225),
-	BackgroundTransparency = 1,
-	Position = UDim2.new(1,-275,0,15),
-	Size = UDim2.fromOffset(45,25),
-	ZIndex = 15,
-},Header)
+local Trade = CreatePage("Trade")
 
-local ThemeButton = New("TextButton",{
-	Text = CurrentTheme.."  ▼",
-	Font = Enum.Font.GothamBold,
-	TextSize = 10,
-	TextColor3 = Color3.new(1,1,1),
-	BackgroundColor3 = Color3.fromRGB(25,12,40),
-	BackgroundTransparency = .1,
-	Position = UDim2.new(1,-225,0,10),
-	Size = UDim2.fromOffset(125,32),
-	AutoButtonColor = false,
-	ZIndex = 20,
-},Header)
+Section(Trade,"Trade")
 
-Corner(ThemeButton,8)
+Dropdown(Trade,"Select Player","TradePlayer",GetPlayers())
 
-local ThemeStroke = Stroke(
-	ThemeButton,
-	GetTheme().accent,
-	1
+Button(Trade,"Refresh Player List",function() end)
+
+Input(Trade,"Item Name","TradeItem","")
+
+Label(Trade,
+    "Trade interface tersedia sebagai framework.\nAksi trade spesifik bergantung pada RemoteEvent resmi game."
 )
+
+--========================================================
+-- WEBHOOK
+--========================================================
+
+local Webhook = CreatePage("Webhook")
+
+Section(Webhook,"Webhook")
+
+Input(Webhook,"Webhook URL","WebhookURL","")
+
+Toggle(Webhook,"Enable Webhook","WebhookEnabled")
+
+Dropdown(Webhook,"Notification","WebhookNotification",{
+    "All",
+    "Rare",
+    "Legendary",
+    "Mythic",
+    "SECRET"
+})
+
+Button(Webhook,"Test Webhook",function()
+    -- Sengaja tidak melakukan HTTP request otomatis.
+    -- Gunakan HttpService hanya jika environment/game mengizinkannya.
+end)
+
+--========================================================
+-- SETTINGS
+--========================================================
+
+local Settings = CreatePage("Settings")
+
+Section(Settings,"Theme")
+
+Dropdown(Settings,"Theme","Theme",{
+    "PURPLE",
+    "PINK",
+    "YELLOW",
+    "GREEN",
+    "GOLD",
+    "RED",
+    "BLUE",
+    "SILVER",
+    "ORANGE",
+    "RAIMBOW"
+})
+
+Button(Settings,"Apply Theme",function()
+    SetAccent(Themes[State.Theme] or Themes.PURPLE)
+end)
+
+Section(Settings,"Window")
+
+Button(Settings,"Reset Window Position",function()
+    Window.Position = UDim2.new(0.5,-380,0.5,-240)
+end)
+
+Button(Settings,"Destroy GUI",function()
+    GUI:Destroy()
+end)
+
+Section(Settings,"Aletta Creator")
+
+Label(Settings,
+    "Aletta Creator Fish It\nFremium / BETA Tester\nUI framework by Aletta Creator."
+)
+
+--========================================================
+-- TAB SETUP
+--========================================================
+
+local tabs = {
+    {"Main","⌂"},
+    {"Favorite","★"},
+    {"Teleport","◉"},
+    {"Shop","$"},
+    {"Automation","⚙"},
+    {"Trade","⇄"},
+    {"Webhook","☁"},
+    {"Settings","⚙"}
+}
+
+for _,data in ipairs(tabs) do
+    CreateTab(data[1],data[2])
+end
+
+-- default
+for name,page in pairs(Pages) do
+    page.Visible = name == "Main"
+end
+
+local firstTab = TabList:FindFirstChildOfClass("TextButton")
+if firstTab then
+    firstTab.BackgroundColor3 = Accent
+    firstTab.TextColor3 = Color3.new(1,1,1)
+end
+
+--========================================================
+-- SEARCH
+--========================================================
+
+SearchBox:GetPropertyChangedSignal("Text"):Connect(function()
+    local query = SearchBox.Text:lower()
+
+    for _,page in pairs(Pages) do
+        for _,obj in ipairs(page:GetChildren()) do
+            if obj:IsA("Frame") or obj:IsA("TextLabel") then
+                local text = ""
+
+                local label = obj:FindFirstChildWhichIsA("TextLabel")
+
+                if label then
+                    text = label.Text:lower()
+                elseif obj:IsA("TextLabel") then
+                    text = obj.Text:lower()
+                end
+
+                if query == "" then
+                    obj.Visible = true
+                else
+                    obj.Visible = text:find(query,1,true) ~= nil
+                end
+            end
+        end
+    end
+end)
+
+--========================================================
+-- DRAG
+--========================================================
+
+local dragging = false
+local dragStart
+local startPos
+
+Header.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+    or input.UserInputType == Enum.UserInputType.Touch then
+
+        dragging = true
+        dragStart = input.Position
+        startPos = Window.Position
+
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+UIS.InputChanged:Connect(function(input)
+    if dragging and (
+        input.UserInputType == Enum.UserInputType.MouseMovement
+        or input.UserInputType == Enum.UserInputType.Touch
+    ) then
+
+        local delta = input.Position - dragStart
+
+        Window.Position = UDim2.new(
+            startPos.X.Scale,
+            startPos.X.Offset + delta.X,
+            startPos.Y.Scale,
+            startPos.Y.Offset + delta.Y
+        )
+    end
+end)
 
 --========================================================
 -- MINIMIZE
 --========================================================
 
-local Minimize = New("TextButton",{
-	Text = "—",
-	Font = Enum.Font.GothamBlack,
-	TextSize = 20,
-	TextColor3 = Color3.new(1,1,1),
-	BackgroundTransparency = 1,
-	Position = UDim2.new(1,-92,0,8),
-	Size = UDim2.fromOffset(30,34),
-	ZIndex = 20,
-},Header)
+local minimized = false
 
-local Close = New("TextButton",{
-	Text = "×",
-	Font = Enum.Font.GothamBlack,
-	TextSize = 20,
-	TextColor3 = GetTheme().accent,
-	BackgroundTransparency = 1,
-	Position = UDim2.new(1,-52,0,8),
-	Size = UDim2.fromOffset(30,34),
-	ZIndex = 20,
-},Header)
+Minimize.MouseButton1Click:Connect(function()
+    minimized = not minimized
+
+    Sidebar.Visible = not minimized
+    Content.Visible = not minimized
+
+    if minimized then
+        Window.Size = UDim2.fromOffset(300,58)
+    else
+        Window.Size = UDim2.fromOffset(760,480)
+    end
+end)
+
+Close.MouseButton1Click:Connect(function()
+    GUI:Destroy()
+end)
 
 --========================================================
--- BODY
+-- LOCK POSITION
 --========================================================
 
-local Body = New("Frame",{
-	Position = UDim2.fromOffset(0,60),
-	Size = UDim2.new(1,0,1,-60),
-	BackgroundTransparency = 1,
-	ZIndex = 5,
-},Main)
+task.spawn(function()
+    while GUI.Parent do
+        task.wait(0.1)
+
+        if State.LockPosition and SavedCFrame and LocalPlayer.Character then
+            local root = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+
+            if root then
+                root.CFrame = SavedCFrame
+            end
+        end
+    end
+end)
 
 --========================================================
--- SIDEBAR
+-- AUTO EQUIP ROD
 --========================================================
 
-local Sidebar = New("Frame",{
-	Position = UDim2.fromOffset(10,10),
-	Size = UDim2.new(0,185,1,-20),
-	BackgroundColor3 = Color3.fromRGB(7,3,14),
-	BackgroundTransparency = .18,
-	ZIndex = 8,
-},Body)
+task.spawn(function()
+    while GUI.Parent do
+        task.wait(1)
 
-Corner(Sidebar,12)
-Stroke(Sidebar,GetTheme().accent,1.4)
+        if State.AutoEquipRod then
+            local char = LocalPlayer.Character
 
-local Search = New("TextBox",{
-	PlaceholderText = "⌕  Search feature...",
-	Text = "",
-	ClearTextOnFocus = false,
-	Font = Enum.Font.Gotham,
-	TextSize = 12,
-	TextColor3 = Color3.new(1,1,1),
-	PlaceholderColor3 = Color3.fromRGB(145,135,155),
-	BackgroundColor3 = Color3.fromRGB(12,6,22),
-	BackgroundTransparency = .15,
-	Position = UDim2.fromOffset(10,10),
-	Size = UDim2.new(1,-20,0,36),
-	ZIndex = 10,
-},Sidebar)
+            if char then
+                local humanoid = char:FindFirstChildOfClass("Humanoid")
+                local backpack = LocalPlayer:FindFirstChildOfClass("Backpack")
 
-Corner(Search,8)
-Stroke(Search,GetTheme().accent,1)
-
-local Nav = New("ScrollingFrame",{
-	Position = UDim2.fromOffset(8,54),
-	Size = UDim2.new(1,-16,1,-64),
-	BackgroundTransparency = 1,
-	CanvasSize = UDim2.new(),
-	AutomaticCanvasSize = Enum.AutomaticSize.Y,
-	ScrollBarThickness = 2,
-	ScrollBarImageColor3 = GetTheme().accent,
-	BorderSizePixel = 0,
-	ZIndex = 9,
-},Sidebar)
-
-local NavLayout = New("UIListLayout",{
-	Padding = UDim.new(0,4),
-	SortOrder = Enum.SortOrder.LayoutOrder,
-},Nav)
+                if humanoid and backpack and not char:FindFirstChildOfClass("Tool") then
+                    for _,tool in ipairs(backpack:GetChildren()) do
+                        if tool:IsA("Tool") then
+                            humanoid:EquipTool(tool)
+                            break
+                        end
+                    end
+                end
+            end
+        end
+    end
+end)
 
 --========================================================
--- CONTENT
+-- PING PANEL
 --========================================================
 
-local Content = New("Frame",{
-	Position = UDim2.fromOffset(205,10),
-	Size = UDim2.new(1,-215,1,-20),
-	BackgroundTransparency = 1,
-	ZIndex = 6,
-},Body)
+local Ping = nil
 
-local PageTitle = New("TextLabel",{
-	Text = "Main",
-	Font = Enum.Font.GothamBlack,
-	TextSize = 17,
-	TextColor3 = Color3.new(1,1,1),
-	BackgroundTransparency = 1,
-	Position = UDim2.fromOffset(8,0),
-	Size = UDim2.new(1,-16,0,34),
-	TextXAlignment = Enum.TextXAlignment.Left,
-	ZIndex = 10,
-},Content)
+task.spawn(function()
+    while GUI.Parent do
+        task.wait(1)
 
-local PageLine = New("Frame",{
-	Position = UDim2.fromOffset(8,35),
-	Size = UDim2.new(1,-16,0,1),
-	BackgroundColor3 = GetTheme().accent,
-	BorderSizePixel = 0,
-	ZIndex = 10,
-},Content)
+        if State.PingPanel then
+            if not Ping then
+                Ping = New("TextLabel", {
+                    Size = UDim2.fromOffset(150,32),
+                    Position = UDim2.new(1,-160,0,68),
+                    BackgroundColor3 = PANEL,
+                    TextColor3 = Accent,
+                    Font = Enum.Font.GothamBold,
+                    TextSize = 11,
+                    Text = "PING: checking...",
+                    ZIndex = 100
+                }, GUI)
 
-local Cards = New("ScrollingFrame",{
-	Position = UDim2.fromOffset(8,44),
-	Size = UDim2.new(1,-16,1,-44),
-	BackgroundTransparency = 1,
-	CanvasSize = UDim2.new(),
-	AutomaticCanvasSize = Enum.AutomaticSize.Y,
-	ScrollBarThickness = 3,
-	ScrollBarImageColor3 = GetTheme().accent,
-	BorderSizePixel = 0,
-	ZIndex = 7,
-},Content)
+                Corner(Ping,6)
+                Stroke(Ping,Accent,1)
+            end
 
-local Grid = New("UIGridLayout",{
-	CellPadding = UDim2.fromOffset(8,8),
-	CellSize = UDim2.new(.333,-7,0,190),
-	SortOrder = Enum.SortOrder.LayoutOrder,
-},Cards)
+            local ping = 0
+
+            pcall(function()
+                ping = math.floor(LocalPlayer:GetNetworkPing() * 1000)
+            end)
+
+            Ping.Text = "PING: "..tostring(ping).." ms"
+
+        elseif Ping then
+            Ping:Destroy()
+            Ping = nil
+        end
+    end
+end)
 
 --========================================================
--- FISH IT FEATURES
+-- AUTO SPAWN TELEPORT
 --========================================================
 
-local Pages = {
+LocalPlayer.CharacterAdded:Connect(function(char)
+    if not State.AutoTeleportSpawn or not SavedCFrame then
+        return
+    end
 
-	Main = {
-		{"Fishing",{
-			{"Auto Fishing","toggle"},
-			{"Auto Recast","toggle"},
-			{"Auto Shake","toggle"},
-			{"Perfect Catch","toggle"},
-			{"Auto Sell Fish","toggle"},
-			{"Delay (Seconds)","input","1"},
-		}},
+    local root = char:WaitForChild("HumanoidRootPart",10)
 
-		Rarity = {
-			{"Select Rarity","dropdown",
-				{"All Rarity","Common","Uncommon","Rare","Epic","Legendary","Mythic","SECRET"}},
-			{"Only Big Fish","toggle"},
-			{"Only Mutation","toggle"},
-			{"Only Rare","toggle"},
-		}},
-
-		Mutation = {
-			{"Select Mutation","dropdown",
-				{"All Mutation","Albino","Aurora","8-Bit","Abyssal","Bloodmoon","Arctic Frost","Binary"}},
-			{"Auto Mutation","toggle"},
-			{"Shiny Only","toggle"},
-			{"Rainbow Only","toggle"},
-		}},
-	},
-
-	Favorite = {
-		{"Auto Favorite",{
-			{"Auto Favorite","toggle"},
-			{"Filter Name","input","Nama item"},
-			{"Filter Variant","dropdown",
-				{"Variant","8-Bit","Abyssal","Albino","Arctic Frost","Aurora","Binary","Bloodmoon"}},
-			{"Filter Rarity","dropdown",
-				{"Semua","Common","Uncommon","Rare","Epic","Legendary","Mythic","SECRET"}},
-		}},
-
-		{"Un-Favorite",{
-			{"Enable Un-Favorite","toggle"},
-			{"Unfav Name","input","Nama item"},
-			{"Unfav Variant","dropdown",{"Variant"}},
-			{"Unfav Rarity","dropdown",
-				{"Semua","Common","Uncommon","Rare","Epic","Legendary","Mythic","SECRET"}},
-		}},
-
-		{"Special Favorite",{
-			{"Auto Favorite Ruby (Gemstone)","toggle"},
-			{"Auto Favorite Legendary (Crystalized)","toggle"},
-		}},
-
-		{"Equipment",{
-			{"Equip Name","input","Nama equipment"},
-			{"Equip Variant","dropdown",{"Variant"}},
-			{"Equip Rarity","dropdown",
-				{"Semua","Common","Uncommon","Rare","Epic","Legendary","Mythic","SECRET"}},
-		}},
-	},
-
-	Teleport = {
-		{"Teleport",{
-			{"Island","dropdown",{
-				"Pilih Island...",
-				"Fisherman Island",
-				"Ocean",
-				"Tropical Grove",
-				"Kohana Island",
-				"Kohana Volcano",
-				"Coral Reefs",
-				"Crater Island",
-				"Esoteric Depths",
-				"Lost Isle",
-				"Sisyphus Statue",
-				"Ancient Jungle",
-				"Sacred Temple",
-				"Pirate Cove",
-				"Crystal Depths",
-				"Pirate Treasure Room",
-			}},
-			{"Teleport","button"},
-		}},
-
-		{"Player",{
-			{"Player","dropdown",{"Pilih player..."}},
-			{"Teleport to Player","button"},
-			{"Refresh Player List","button"},
-		}},
-
-		{"NPC",{
-			{"NPC","dropdown",{"Pilih NPC..."}},
-			{"Teleport to NPC","button"},
-			{"Refresh NPC List","button"},
-		}},
-
-		{"Event",{
-			{"Event","dropdown",{"Pilih event..."}},
-			{"Priority Event","dropdown",{"Auto Detect Event"}},
-			{"Refresh Event List","button"},
-			{"Auto Event Teleport","toggle"},
-		}},
-
-		{"Saved Location",{
-			{"Save Current Location","button"},
-			{"Teleport to Saved","button"},
-			{"Reset Saved Location","button"},
-			{"Auto Teleport on Spawn","toggle"},
-		}},
-	},
-
-	Shop = {
-		{"Rod & Bait",{
-			{"Select Rod","dropdown",
-				{"Select Option","Starter Rod","Carbon Rod","Lucky Rod","Fast Rod","Event Rod"}},
-			{"Buy Rod","button"},
-			{"Select Bait","dropdown",
-				{"Select Option","Basic Bait","Worm","Golden Bait","Mystic Bait"}},
-			{"Buy Bait","button"},
-		}},
-
-		{"Weather",{
-			{"Select Weather","dropdown",
-				{"Clear","Rain","Storm","Aurora Borealis","Meteor Shower"}},
-			{"Buy Weather","button"},
-		}},
-
-		{"Black Market",{
-			{"Shop Category","dropdown",
-				{"All Items","Rod","Bait","Equipment","Gemstone","Other"}},
-			{"Amount","input","1"},
-			{"Refresh Shop","button"},
-		}},
-	},
-
-	Automation = {
-		{"Automation",{
-			{"Auto Fishing","toggle"},
-			{"Auto Sell","toggle"},
-			{"Auto Favorite","toggle"},
-			{"Auto Equip Best Rod","toggle"},
-			{"Auto Equip Best Bait","toggle"},
-			{"Auto Recast","toggle"},
-			{"Auto Shake","toggle"},
-			{"Auto Perfect Catch","toggle"},
-			{"Auto Event Teleport","toggle"},
-			{"Auto Teleport on Spawn","toggle"},
-		}},
-	},
-
-	Trade = {
-		{"Trade",{
-			{"Select Player","dropdown",{"Pilih player..."}},
-			{"Select Item","dropdown",{"Pilih item..."}},
-			{"Amount","input","1"},
-			{"Trade","button"},
-			{"Refresh Player List","button"},
-		}},
-	},
-
-	Webhook = {
-		{"Webhook",{
-			{"Webhook URL","input","Masukkan webhook URL..."},
-			{"Send Webhook","button"},
-			{"Test Webhook","button"},
-			{"Notify Fish","toggle"},
-			{"Notify Mutation","toggle"},
-			{"Notify Legendary","toggle"},
-			{"Notify SECRET","toggle"},
-		}},
-	},
-
-	Settings = {
-		{"Appearance",{
-			{"Theme","dropdown",
-				{"PURPLE","PINK","YELLOW","GREEN","GOLD","RED","BLUE","SILVER","ORANGE","RAIMBOW"}},
-			{"Animation","toggle",true},
-			{"Reset GUI Position","button"},
-		}},
-	},
-
-	Config = {
-		{"Configuration",{
-			{"Auto Save Config","toggle",true},
-			{"Save Config Now","button"},
-			{"Reset to Default","button"},
-		}},
-	},
-
-	Info = {
-		{"Aletta Creator",{
-			{"Aletta Creator Fish It","label"},
-			{"Premium Edition","label"},
-			{"Theme System Enabled","label"},
-			{"Asset: 115178015210033","label"},
-		}},
-	},
-}
+    if root then
+        task.wait(0.5)
+        root.CFrame = SavedCFrame
+    end
+end)
 
 --========================================================
--- WIDGETS
+-- RAINBOW THEME
 --========================================================
 
-local function MakeToggle(parent,data)
+task.spawn(function()
+    local hue = 0
 
-	local row = New("Frame",{
-		Size = UDim2.new(1,-8,0,31),
-		BackgroundColor3 = Color3.fromRGB(14,7,24),
-		BackgroundTransparency = .18,
-	},parent)
+    while GUI.Parent do
+        task.wait(0.03)
 
-	Corner(row,7)
+        if State.Theme == "RAIMBOW" then
+            hue = (hue + 0.003) % 1
+            SetAccent(Color3.fromHSV(hue,0.75,1))
+        end
+    end
+end)
 
-	local label = New("TextLabel",{
-		Text = data[1],
-		Font = Enum.Font.Gotham,
-		TextSize = 11,
-		TextColor3 = Color3.fromRGB(235,235,240),
-		BackgroundTransparency = 1,
-		Position = UDim2.fromOffset(8,0),
-		Size = UDim2.new(1,-55,1,0),
-		TextXAlignment = Enum.TextXAlignment.Left,
-	},row)
-
-	local button = New("TextButton",{
-		Text = "",
-		BackgroundColor3 = Color3.fromRGB(75,75,82),
-		Position = UDim2.new(1,-42,.5,-9),
-		Size = UDim2.fromOffset(34,18),
-		AutoButtonColor = false,
-	},row)
-
-	Corner(button,10)
-
-	local knob = New("Frame",{
-		Size = UDim2.fromOffset(14,14),
-		Position = UDim2.fromOffset(2,2),
-		BackgroundColor3 = Color3.new(1,1,1),
-	},button)
-
-	Corner(knob,8)
-
-	local enabled = data[3] == true
-
-	local function refresh()
-		button.BackgroundColor3 =
-			enabled and GetTheme().accent
-			or Color3.fromRGB(75,75,82)
-
-		knob.Position =
-			enabled
-			and UDim2.new(1,-16,0,2)
-			or UDim2.fromOffset(2,2)
-	end
-
-	refresh()
-
-	button.MouseButton1Click:Connect(function()
-		enabled = not enabled
-		refresh()
-	end)
-
-	return row
-end
-
-local function MakeDropdown(parent,data)
-
-	local row = New("Frame",{
-		Size = UDim2.new(1,-8,0,33),
-		BackgroundTransparency = 1,
-	},parent)
-
-	local label = New("TextLabel",{
-		Text = data[1],
-		Font = Enum.Font.Gotham,
-		TextSize = 11,
-		TextColor3 = Color3.fromRGB(230,230,235),
-		BackgroundTransparency = 1,
-		Position = UDim2.fromOffset(8,0),
-		Size = UDim2.new(.48,0,1,0),
-		TextXAlignment = Enum.TextXAlignment.Left,
-	},row)
-
-	local options = data[3] or {"Select Option"}
-
-	local button = New("TextButton",{
-		Text = options[1],
-		Font = Enum.Font.Gotham,
-		TextSize = 10,
-		TextColor3 = Color3.new(1,1,1),
-		BackgroundColor3 = Color3.fromRGB(18,10,30),
-		Position = UDim2.new(.48,0,0,1),
-		Size = UDim2.new(.52,-8,0,29),
-		AutoButtonColor = false,
-		ZIndex = 20,
-	},row)
-
-	Corner(button,7)
-	Stroke(button,GetTheme().accent,1)
-
-	local popup = New("Frame",{
-		Visible = false,
-		BackgroundColor3 = Color3.fromRGB(9,4,16),
-		Position
+print("Aletta Creator Fish It loaded.")

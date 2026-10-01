@@ -23,7 +23,6 @@ local TeleportService = game:GetService("TeleportService")
 local GuiService = game:GetService("GuiService")
 local VirtualUser = game:GetService("VirtualUser")
 local HttpService = game:GetService("HttpService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 --// SINGLE EXECUTE / KEEP LOADED
 --// Jika aktif, execute kedua tidak membuat GUI/fitur baru.
@@ -58,223 +57,280 @@ if not playerGui then
     return
 end
 
--- =========================================================
--- ALETTA CREATOR V15 - WEB KEY SYSTEM
--- =========================================================
--- Satu LocalScript: mencoba HTTP request executor terlebih dahulu.
--- Jika HTTP executor tidak tersedia, otomatis memakai Server Bridge
--- (ReplicatedStorage/AlettaCreatorRemotes/VerifyKey).
---
--- Ganti URL DI SINI dengan URL deployment API Vercel kamu.
--- Contoh: https://aletta-creator-api.vercel.app
-local ALETTA_API_BASE = "https://alettacreatorapi.vercel.app"
 
-local function getGlobal(name)
-    local ok, value = pcall(function()
-        return _G[name]
+-- =========================================================
+-- ALETTA CREATOR V15 - RAW GITHUB WEB KEY GATE
+-- =========================================================
+-- V14 runtime di bawah ini sengaja dipertahankan apa adanya.
+-- Key gate hanya berjalan sebelum GUI V14 dibuat.
+
+local ALETTA_API_BASE = "https://alettacreatorapi.vercel.app"
+local ALETTA_KEY_INFO = {valid=false}
+
+local function AC_getEnv()
+    local env = nil
+    pcall(function()
+        if type(getgenv) == "function" then
+            env = getgenv()
+        end
     end)
-    return ok and value or nil
+    if type(env) ~= "table" then env = _G end
+    return env
 end
 
-local function getRequestFunction()
-    local candidates = {
-        getGlobal("request"),
-        getGlobal("http_request"),
-        getGlobal("httprequest"),
-    }
-    local ok, synRequest = pcall(function()
-        return syn and syn.request
-    end)
-    if ok and synRequest then table.insert(candidates, synRequest) end
-    local ok2, fluxusRequest = pcall(function()
-        return fluxus and fluxus.request
-    end)
-    if ok2 and fluxusRequest then table.insert(candidates, fluxusRequest) end
-    local ok3, httpRequest = pcall(function()
-        return http and http.request
-    end)
-    if ok3 and httpRequest then table.insert(candidates, httpRequest) end
-    for _, fn in ipairs(candidates) do
-        if type(fn) == "function" then return fn end
+local function AC_getRequest()
+    local env = AC_getEnv()
+    local names = {"request", "http_request", "httprequest"}
+    for _, name in ipairs(names) do
+        local ok, fn = pcall(function() return env[name] end)
+        if ok and type(fn) == "function" then return fn end
     end
     return nil
 end
 
-local function trim(s)
+local function AC_trim(s)
     return tostring(s or ""):gsub("^%s+", ""):gsub("%s+$", "")
 end
 
-local function makeKeyGateObject(className, props, parent)
-    local o = Instance.new(className)
+local function AC_make(className, props, parent)
+    local ok, obj = pcall(function() return Instance.new(className) end)
+    if not ok or not obj then return nil end
     for k,v in pairs(props or {}) do
-        pcall(function() o[k] = v end)
+        pcall(function() obj[k] = v end)
     end
-    if parent then o.Parent = parent end
-    return o
+    if parent then obj.Parent = parent end
+    return obj
 end
 
-local function gateCorner(o, r)
+local function AC_corner(obj, radius)
+    if not obj then return end
     local c = Instance.new("UICorner")
-    c.CornerRadius = UDim.new(0, r)
-    c.Parent = o
+    c.CornerRadius = UDim.new(0, radius)
+    c.Parent = obj
 end
 
-local function gateExpiryText(value)
-    if not value then return "Tidak diketahui" end
-    local s = tostring(value)
-    local y,mo,d,h,mi,se = s:match("^(%d%d%d%d)%-(%d%d)%-(%d%d)[T ](%d%d):(%d%d):(%d%d)")
-    if y then
-        local ok, stamp = pcall(function()
-            return os.time({year=tonumber(y), month=tonumber(mo), day=tonumber(d), hour=tonumber(h), min=tonumber(mi), sec=tonumber(se)})
-        end)
-        if ok and stamp then return os.date("%d/%m/%Y %H:%M:%S", stamp) end
+local function AC_verify(key)
+    local fn = AC_getRequest()
+    if type(fn) ~= "function" then
+        return nil, "NO_HTTP_REQUEST"
     end
-    return s
-end
 
-local function verifyDirect(key, hwid)
-    local requestFn = getRequestFunction()
-    if not requestFn then return nil, "NO_HTTP_REQUEST" end
-    if ALETTA_API_BASE:find("YOUR%-API%-DOMAIN", 1, false) then
-        return nil, "API_URL_NOT_CONFIGURED"
+    local hwid = "SESSION-" .. tostring(player.UserId) .. "-" .. tostring(game.PlaceId)
+    local okId, analytics = pcall(function()
+        return game:GetService("RbxAnalyticsService")
+    end)
+    if okId and analytics then
+        local okClient, clientId = pcall(function()
+            return analytics:GetClientId()
+        end)
+        if okClient and clientId and tostring(clientId) ~= "" then
+            hwid = tostring(clientId)
+        end
     end
 
     local body = HttpService:JSONEncode({
-        key = key,
+        key = AC_trim(key),
         userId = tostring(player.UserId),
         hwid = hwid
     })
-    local ok, response = pcall(function()
-        return requestFn({
+
+    local okReq, response = pcall(function()
+        return fn({
             Url = ALETTA_API_BASE .. "/api/verify",
             Method = "POST",
             Headers = { ["Content-Type"] = "application/json" },
             Body = body
         })
     end)
-    if not ok or type(response) ~= "table" then
-        return nil, "HTTP_REQUEST_FAILED"
+
+    if not okReq then
+        return nil, "HTTP_REQUEST_ERROR"
     end
+    if type(response) ~= "table" then
+        return nil, "INVALID_HTTP_RESPONSE"
+    end
+
     local raw = response.Body or response.body or ""
-    local decodedOk, data = pcall(function() return HttpService:JSONDecode(raw) end)
-    if not decodedOk or type(data) ~= "table" then
-        return nil, "INVALID_API_RESPONSE"
-    end
-    if data.success then
-        return {success=true, type=data.type, expiresAt=data.expiresAt}, nil
-    end
-    return {success=false, error=tostring(data.error or "VERIFY_FAILED")}, nil
-end
+    if raw == "" then return nil, "EMPTY_API_RESPONSE" end
 
-local function verifyViaServer(key, hwid)
-    local folder = ReplicatedStorage:FindFirstChild("AlettaCreatorRemotes")
-    local remote = folder and folder:FindFirstChild("VerifyKey")
-    if not remote or not remote:IsA("RemoteFunction") then
-        return nil, "SERVER_BRIDGE_NOT_FOUND"
-    end
-    local ok, result = pcall(function()
-        return remote:InvokeServer({key=key, hwid=hwid})
+    local okJson, data = pcall(function()
+        return HttpService:JSONDecode(raw)
     end)
-    if not ok then return nil, "SERVER_BRIDGE_FAILED" end
-    if type(result) ~= "table" then return nil, "INVALID_BRIDGE_RESPONSE" end
-    return result, nil
-end
-
-local function getDeviceIdForKey()
-    local ok, analytics = pcall(function() return game:GetService("RbxAnalyticsService") end)
-    if ok and analytics then
-        local ok2, id = pcall(function() return analytics:GetClientId() end)
-        if ok2 and id and tostring(id) ~= "" then return tostring(id) end
+    if not okJson or type(data) ~= "table" then
+        return nil, "INVALID_API_JSON"
     end
-    return "SESSION-" .. tostring(player.UserId) .. "-" .. tostring(game.PlaceId)
+
+    if data.success == true then
+        return {
+            success = true,
+            type = tostring(data.type or "UNKNOWN"),
+            expiresAt = data.expiresAt
+        }, nil
+    end
+
+    return {
+        success = false,
+        error = tostring(data.error or "VERIFY_FAILED")
+    }, nil
 end
 
-local keyInfo = {valid=false, type="UNKNOWN", expiresAt=nil}
-
-local function createKeyGate()
-    local gate = makeKeyGateObject("ScreenGui", {
-        Name="AlettaPremiumKey", ResetOnSpawn=false, IgnoreGuiInset=true,
-        DisplayOrder=10000, ZIndexBehavior=Enum.ZIndexBehavior.Global
+local function AC_createGate()
+    local gate = AC_make("ScreenGui", {
+        Name = "AlettaV15KeyGate",
+        ResetOnSpawn = false,
+        IgnoreGuiInset = true,
+        DisplayOrder = 999999,
+        ZIndexBehavior = Enum.ZIndexBehavior.Global
     }, playerGui)
-    local bg = makeKeyGateObject("Frame", {
-        Size=UDim2.fromScale(1,1), BackgroundColor3=Color3.fromRGB(7,4,12),
-        BackgroundTransparency=0.08
+    if not gate then return nil end
+
+    local bg = AC_make("Frame", {
+        Size = UDim2.fromScale(1,1),
+        BackgroundColor3 = Color3.fromRGB(7,4,12),
+        BorderSizePixel = 0
     }, gate)
-    local card = makeKeyGateObject("Frame", {
-        Size=UDim2.fromOffset(400,310), Position=UDim2.new(.5,-200,.5,-155),
-        BackgroundColor3=Color3.fromRGB(18,12,28), BorderSizePixel=0
+
+    local card = AC_make("Frame", {
+        Size = UDim2.fromOffset(410,310),
+        Position = UDim2.new(0.5,-205,0.5,-155),
+        BackgroundColor3 = Color3.fromRGB(18,12,28),
+        BorderSizePixel = 0
     }, bg)
-    gateCorner(card,14)
-    makeKeyGateObject("UIStroke", {Color=Color3.fromRGB(150,80,255),Thickness=2}, card)
-    makeKeyGateObject("TextLabel", {
-        Size=UDim2.new(1,-32,0,36), Position=UDim2.fromOffset(16,15), BackgroundTransparency=1,
-        Text="ALETTA CREATOR V15", Font=Enum.Font.GothamBold, TextSize=22,
-        TextColor3=Color3.new(1,1,1), TextXAlignment=Enum.TextXAlignment.Left
-    }, card)
-    makeKeyGateObject("TextLabel", {
-        Size=UDim2.new(1,-32,0,30), Position=UDim2.fromOffset(16,50), BackgroundTransparency=1,
-        Text="Web Key System • Free / Premium", Font=Enum.Font.Gotham, TextSize=13,
-        TextColor3=Color3.fromRGB(190,180,205), TextXAlignment=Enum.TextXAlignment.Left
-    }, card)
-    local input=makeKeyGateObject("TextBox", {
-        Size=UDim2.new(1,-32,0,46), Position=UDim2.fromOffset(16,88),
-        BackgroundColor3=Color3.fromRGB(38,30,54), BorderSizePixel=0,
-        PlaceholderText="Masukkan Aletta Key...", PlaceholderColor3=Color3.fromRGB(125,115,140),
-        Text="", ClearTextOnFocus=false, Font=Enum.Font.GothamMedium, TextSize=13,
-        TextColor3=Color3.new(1,1,1)
-    }, card)
-    gateCorner(input,8)
-    local verify=makeKeyGateObject("TextButton", {
-        Size=UDim2.new(1,-32,0,44), Position=UDim2.fromOffset(16,144),
-        BackgroundColor3=Color3.fromRGB(150,80,255), BorderSizePixel=0,
-        Text="VERIFY KEY", Font=Enum.Font.GothamBold, TextSize=14, TextColor3=Color3.new(1,1,1)
-    }, card)
-    gateCorner(verify,8)
-    local status=makeKeyGateObject("TextLabel", {
-        Size=UDim2.new(1,-32,0,84), Position=UDim2.fromOffset(16,200), BackgroundTransparency=1,
-        Text="Masukkan key lalu tekan VERIFY KEY.", Font=Enum.Font.Gotham, TextSize=12,
-        TextWrapped=true, TextColor3=Color3.fromRGB(190,180,205),
-        TextXAlignment=Enum.TextXAlignment.Left, TextYAlignment=Enum.TextYAlignment.Top
+    AC_corner(card,14)
+
+    AC_make("UIStroke", {
+        Color = Color3.fromRGB(150,80,255),
+        Thickness = 2
     }, card)
 
-    local busy=false
-    local function verify()
+    AC_make("TextLabel", {
+        Size = UDim2.new(1,-32,0,34),
+        Position = UDim2.fromOffset(16,14),
+        BackgroundTransparency = 1,
+        Text = "ALETTA CREATOR V15",
+        Font = Enum.Font.GothamBold,
+        TextSize = 22,
+        TextColor3 = Color3.new(1,1,1),
+        TextXAlignment = Enum.TextXAlignment.Left
+    }, card)
+
+    AC_make("TextLabel", {
+        Size = UDim2.new(1,-32,0,25),
+        Position = UDim2.fromOffset(16,48),
+        BackgroundTransparency = 1,
+        Text = "Web Key System",
+        Font = Enum.Font.Gotham,
+        TextSize = 13,
+        TextColor3 = Color3.fromRGB(190,180,205),
+        TextXAlignment = Enum.TextXAlignment.Left
+    }, card)
+
+    local input = AC_make("TextBox", {
+        Size = UDim2.new(1,-32,0,44),
+        Position = UDim2.fromOffset(16,82),
+        BackgroundColor3 = Color3.fromRGB(38,30,54),
+        BorderSizePixel = 0,
+        PlaceholderText = "Masukkan Aletta Key...",
+        PlaceholderColor3 = Color3.fromRGB(125,115,140),
+        Text = "",
+        ClearTextOnFocus = false,
+        Font = Enum.Font.GothamMedium,
+        TextSize = 13,
+        TextColor3 = Color3.new(1,1,1)
+    }, card)
+    AC_corner(input,8)
+
+    local button = AC_make("TextButton", {
+        Size = UDim2.new(1,-32,0,44),
+        Position = UDim2.fromOffset(16,136),
+        BackgroundColor3 = Color3.fromRGB(150,80,255),
+        BorderSizePixel = 0,
+        Text = "VERIFY KEY",
+        Font = Enum.Font.GothamBold,
+        TextSize = 14,
+        TextColor3 = Color3.new(1,1,1)
+    }, card)
+    AC_corner(button,8)
+
+    local status = AC_make("TextLabel", {
+        Size = UDim2.new(1,-32,0,90),
+        Position = UDim2.fromOffset(16,194),
+        BackgroundTransparency = 1,
+        Text = "Masukkan key lalu tekan VERIFY KEY.",
+        Font = Enum.Font.Gotham,
+        TextSize = 12,
+        TextWrapped = true,
+        TextColor3 = Color3.fromRGB(190,180,205),
+        TextXAlignment = Enum.TextXAlignment.Left,
+        TextYAlignment = Enum.TextYAlignment.Top
+    }, card)
+
+    local busy = false
+    local function doVerify()
         if busy then return end
-        local key=trim(input.Text)
-        if key=="" then status.Text="Masukkan Key terlebih dahulu."; return end
-        busy=true; verify.Active=false; verify.Text="CHECKING..."
-        status.Text="Menghubungkan ke API..."
-        local hwid=getDeviceIdForKey()
-        local result, directErr=verifyDirect(key,hwid)
-        if not result then
-            status.Text="Mencoba Server Bridge..."
-            result=select(1,verifyViaServer(key,hwid))
+        local key = AC_trim(input.Text)
+        if key == "" then
+            status.Text = "Masukkan key terlebih dahulu."
+            return
         end
-        if type(result)=="table" and result.success then
-            keyInfo.valid=true; keyInfo.type=tostring(result.type or "UNKNOWN"); keyInfo.expiresAt=result.expiresAt
-            status.Text="KEY VALID\nType: "..keyInfo.type.."\nExpired: "..gateExpiryText(keyInfo.expiresAt)
-            task.wait(.45)
-            if gate.Parent then gate:Destroy() end
-            return true
+
+        busy = true
+        button.Active = false
+        button.Text = "CHECKING..."
+        status.Text = "Menghubungkan ke Aletta API..."
+
+        local result, err = AC_verify(key)
+        if result and result.success then
+            ALETTA_KEY_INFO.valid = true
+            ALETTA_KEY_INFO.type = result.type
+            ALETTA_KEY_INFO.expiresAt = result.expiresAt
+            status.Text = "KEY VALID\nType: " .. result.type
+            task.wait(0.35)
+            gate:Destroy()
+            return
         end
-        local err=(type(result)=="table" and result.error) or directErr or "VERIFY_FAILED"
-        if err=="SERVER_BRIDGE_NOT_FOUND" and directErr=="API_URL_NOT_CONFIGURED" then
-            err="API_URL_NOT_CONFIGURED — isi ALETTA_API_BASE atau pasang Server Bridge"
-        end
-        status.Text="Key ditolak / koneksi gagal:\n"..tostring(err)
-        verify.Text="VERIFY KEY"; verify.Active=true; busy=false
-        return false
+
+        local reason = (result and result.error) or err or "VERIFY_FAILED"
+        local friendly = {
+            NO_HTTP_REQUEST = "Executor tidak menyediakan HTTP request.",
+            HTTP_REQUEST_ERROR = "HTTP request gagal dikirim.",
+            INVALID_HTTP_RESPONSE = "Executor memberi response HTTP yang tidak valid.",
+            EMPTY_API_RESPONSE = "API tidak mengirim response.",
+            INVALID_API_JSON = "Response API bukan JSON yang valid.",
+            KEY_NOT_FOUND = "Key tidak ditemukan.",
+            KEY_REVOKED = "Key sudah dicabut.",
+            KEY_EXPIRED = "Key sudah expired.",
+            USER_MISMATCH = "Key terikat ke UserId lain.",
+            HWID_MISMATCH = "Key terikat ke perangkat lain.",
+            MISSING_FIELDS = "Data verifikasi tidak lengkap.",
+            VERIFY_FAILED = "Verifikasi gagal."
+        }
+        status.Text = friendly[reason] or ("Verifikasi gagal: " .. tostring(reason))
+        button.Text = "VERIFY KEY"
+        button.Active = true
+        busy = false
     end
-    verify.Activated:Connect(verify)
-    input.FocusLost:Connect(function(enter) if enter then verify() end end)
+
+    button.Activated:Connect(doVerify)
+    input.FocusLost:Connect(function(enterPressed)
+        if enterPressed then doVerify() end
+    end)
     return gate
 end
 
-local keyGate=createKeyGate()
-while keyGate and keyGate.Parent and not keyInfo.valid do
-    task.wait(.15)
+local keyGate = AC_createGate()
+if not keyGate then
+    warn("[Aletta V15] Gagal membuat Key Gate.")
+    return
 end
-if not keyInfo.valid then return end
+
+while keyGate.Parent and not ALETTA_KEY_INFO.valid do
+    task.wait(0.1)
+end
+
+if not ALETTA_KEY_INFO.valid then
+    return
+end
 
 local camera = workspace.CurrentCamera
 
@@ -3638,4 +3694,21 @@ clearESP = function()
 
     if espGui then
         for _, object in ipairs(espGui:GetChildren()) do
+            object:Destroy()
+        end
+    end
+end
+
+local function normalizeESPText(value)
+    if value == nil then return nil end
+    local text = tostring(value):lower():gsub("%s+", "")
+    if text:find("killer", 1, true) then return "Killer" end
+    if text:find("survivor", 1, true) then return "Survivor" end
+    if text:find("zombie", 1, true) then return "Zombie" end
+    if text:find("scp", 1, true) then return "SCP" end
+    return nil
+end
+
+-- Role detector yang lebih toleran. Build sebelumnya hanya membaca
+-- Attribute("Role"), sehingga ESP mati ji
 Pratinjau dipotong karena File berukuran besar

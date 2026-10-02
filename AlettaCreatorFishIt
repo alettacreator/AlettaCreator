@@ -1,1 +1,2155 @@
+--[[
+    ALEtta Creator Fish It
+    Fremium / Developer Edition
+    SINGLE LOCAL SCRIPT
 
+    GUI:
+    Main
+    Favorite
+    Teleport
+    Shop
+    Automation
+    Trade
+    Webhook
+    Settings
+    Config
+    Info
+
+    Catatan:
+    - Client utility seperti teleport, saved position, player list,
+      NPC discovery, ping, UI dan auto-equip tool dapat berjalan langsung.
+    - Remote gameplay Fish It tidak ditebak/dipalsukan.
+      Hook tersedia agar remote yang benar dapat dihubungkan kemudian.
+]]
+
+--// SERVICES
+local Players = game:GetService("Players")
+local UIS = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local HttpService = game:GetService("HttpService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local StarterGui = game:GetService("StarterGui")
+
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+--//==================================================
+--// ALEtta SETTINGS
+--//==================================================
+
+local VERSION = "Fish It Fremium v1.0"
+
+local THEMES = {
+    PURPLE = {
+        Main = Color3.fromRGB(150,80,255),
+        Dark = Color3.fromRGB(14,10,22),
+        Panel = Color3.fromRGB(20,16,30),
+        Field = Color3.fromRGB(38,30,54),
+        Text = Color3.fromRGB(245,240,255),
+        Sub = Color3.fromRGB(175,175,185)
+    },
+
+    PINK = {
+        Main = Color3.fromRGB(255,80,180),
+        Dark = Color3.fromRGB(25,10,20),
+        Panel = Color3.fromRGB(32,15,27),
+        Field = Color3.fromRGB(55,25,45),
+        Text = Color3.fromRGB(255,245,250),
+        Sub = Color3.fromRGB(190,170,180)
+    },
+
+    YELLOW = {
+        Main = Color3.fromRGB(255,200,50),
+        Dark = Color3.fromRGB(22,18,8),
+        Panel = Color3.fromRGB(32,27,14),
+        Field = Color3.fromRGB(55,47,24),
+        Text = Color3.fromRGB(255,250,230),
+        Sub = Color3.fromRGB(190,180,150)
+    },
+
+    GREEN = {
+        Main = Color3.fromRGB(70,220,120),
+        Dark = Color3.fromRGB(8,20,13),
+        Panel = Color3.fromRGB(14,32,21),
+        Field = Color3.fromRGB(25,55,36),
+        Text = Color3.fromRGB(235,255,240),
+        Sub = Color3.fromRGB(170,195,180)
+    },
+
+    GOLD = {
+        Main = Color3.fromRGB(255,175,45),
+        Dark = Color3.fromRGB(22,15,7),
+        Panel = Color3.fromRGB(34,24,12),
+        Field = Color3.fromRGB(57,40,20),
+        Text = Color3.fromRGB(255,247,225),
+        Sub = Color3.fromRGB(195,180,150)
+    },
+
+    RED = {
+        Main = Color3.fromRGB(245,65,75),
+        Dark = Color3.fromRGB(22,8,10),
+        Panel = Color3.fromRGB(34,13,16),
+        Field = Color3.fromRGB(57,23,27),
+        Text = Color3.fromRGB(255,240,242),
+        Sub = Color3.fromRGB(195,170,175)
+    },
+
+    BLUE = {
+        Main = Color3.fromRGB(70,145,255),
+        Dark = Color3.fromRGB(8,14,24),
+        Panel = Color3.fromRGB(14,23,38),
+        Field = Color3.fromRGB(24,42,68),
+        Text = Color3.fromRGB(235,245,255),
+        Sub = Color3.fromRGB(170,185,205)
+    },
+
+    SILVER = {
+        Main = Color3.fromRGB(190,195,205),
+        Dark = Color3.fromRGB(14,15,18),
+        Panel = Color3.fromRGB(24,25,29),
+        Field = Color3.fromRGB(43,45,50),
+        Text = Color3.fromRGB(245,245,248),
+        Sub = Color3.fromRGB(175,178,185)
+    },
+
+    ORANGE = {
+        Main = Color3.fromRGB(255,120,45),
+        Dark = Color3.fromRGB(22,12,7),
+        Panel = Color3.fromRGB(34,19,12),
+        Field = Color3.fromRGB(58,31,20),
+        Text = Color3.fromRGB(255,243,235),
+        Sub = Color3.fromRGB(200,175,160)
+    },
+
+    RAIMBOW = {
+        Main = Color3.fromRGB(180,90,255),
+        Dark = Color3.fromRGB(14,10,22),
+        Panel = Color3.fromRGB(20,16,30),
+        Field = Color3.fromRGB(38,30,54),
+        Text = Color3.fromRGB(245,240,255),
+        Sub = Color3.fromRGB(175,175,185)
+    }
+}
+
+local CurrentTheme = "PURPLE"
+local Theme = THEMES[CurrentTheme]
+
+--//==================================================
+--// STATE
+--//==================================================
+
+local State = {
+    Minimized = false,
+
+    NoFishingAnimation = false,
+    AutoEquipRod = false,
+    BypassRadar = false,
+    LockPosition = false,
+    ShowPing = false,
+    DisableCutscenes = false,
+
+    StableResult = false,
+    SkipRarity = false,
+    SkipTarget = "None",
+
+    LegitFishing = false,
+    AutoShake = false,
+    ShakeDelay = 0.05,
+
+    InstantFishing = false,
+    InstantMode = "Normal",
+    InstantDelay = 0.04,
+
+    InstantFastReel = false,
+    UltraBlatant = false,
+    FastReelMode = "Normal",
+    FishingCompleteDelay = 0.30,
+
+    BlatantV2 = false,
+    SpamCastDelay = 0.05,
+    CompleteDelayV2 = 0.01,
+
+    DisableFishNotification = false,
+    DisableSkinEffect = false,
+    WalkOnWater = false,
+    AutoDivingGear = false,
+    HidePlayers = false,
+    DisableAbilityVFX = false,
+
+    AutoFavorite = false,
+    FavoriteName = "",
+    FavoriteVariant = "None",
+    FavoriteRarity = "None",
+
+    UnFavoriteName = "",
+    UnFavoriteVariant = "None",
+    UnFavoriteRarity = "None",
+
+    AutoFavoriteRuby = false,
+    AutoFavoriteLegendary = false,
+    AutoFavoriteEquipment = false,
+
+    EquipmentName = "",
+    EquipmentVariant = "None",
+    EquipmentRarity = "None",
+
+    SelectedIsland = "Fisherman Island",
+    SelectedPlayer = "",
+    SelectedEvent = "None",
+    SelectedNPC = "None",
+
+    SavedCFrame = nil,
+    AutoTeleportSpawn = false,
+    AutoEventTeleport = false,
+
+    ShopCategory = "Rod",
+    ShopRarity = "None",
+    ShopSearch = "",
+
+    AutoFishing = false,
+    AutoReel = false,
+    AutoPerfectCrafting = false,
+    FishingDelay = 0.10,
+    ReelDelay = 0.10,
+    CraftingDelay = 0.10,
+
+    TradePlayer = "",
+    TradeItem = "",
+    TradeVariant = "None",
+    TradeRarity = "None",
+
+    WebhookURL = "",
+    WebhookEnabled = false,
+    WebhookRarity = "SECRET",
+    WebhookFish = true,
+    WebhookEvent = true,
+    WebhookTrade = false,
+
+    ShowBackground = true,
+    ShowHeaderLogo = true,
+    UIAnimation = true,
+    RememberPosition = true,
+    UIScale = 1,
+
+    AutoSaveConfig = true
+}
+
+--//==================================================
+--// SAFE FEATURE MANAGER
+--//==================================================
+
+local FeatureManager = {}
+local Connections = {}
+
+function FeatureManager:Set(name, enabled)
+    State[name] = enabled
+
+    if enabled then
+        if self[name] then
+            pcall(self[name])
+        end
+    end
+end
+
+function FeatureManager:Connect(name, signal, callback)
+    if Connections[name] then
+        Connections[name]:Disconnect()
+    end
+
+    Connections[name] = signal:Connect(callback)
+end
+
+function FeatureManager:Stop(name)
+    if Connections[name] then
+        Connections[name]:Disconnect()
+        Connections[name] = nil
+    end
+end
+
+function FeatureManager:StopAll()
+    for name, connection in pairs(Connections) do
+        connection:Disconnect()
+        Connections[name] = nil
+    end
+end
+
+--//==================================================
+--// GUI ROOT
+--//==================================================
+
+local old = PlayerGui:FindFirstChild("AlettaCreatorGUI")
+if old then
+    old:Destroy()
+end
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "AlettaCreatorGUI"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.Parent = PlayerGui
+
+--//==================================================
+--// MINI BUTTON
+--//==================================================
+
+local Mini = Instance.new("TextButton")
+Mini.Name = "AlettaMini"
+Mini.Size = UDim2.fromOffset(52,52)
+Mini.Position = UDim2.new(0,25,0.5,-26)
+Mini.BackgroundColor3 = Theme.Panel
+Mini.Text = "A"
+Mini.TextColor3 = Theme.Main
+Mini.TextSize = 25
+Mini.Font = Enum.Font.GothamBold
+Mini.AutoButtonColor = false
+Mini.Visible = true
+Mini.Parent = ScreenGui
+
+local MiniCorner = Instance.new("UICorner")
+MiniCorner.CornerRadius = UDim.new(1,0)
+MiniCorner.Parent = Mini
+
+local MiniStroke = Instance.new("UIStroke")
+MiniStroke.Color = Theme.Main
+MiniStroke.Thickness = 2
+MiniStroke.Parent = Mini
+
+--//==================================================
+--// MAIN WINDOW
+--//==================================================
+
+local Window = Instance.new("Frame")
+Window.Name = "MainWindow"
+Window.Size = UDim2.fromOffset(680,470)
+Window.Position = UDim2.new(0.5,-340,0.5,-235)
+Window.BackgroundColor3 = Theme.Dark
+Window.BorderSizePixel = 0
+Window.Parent = ScreenGui
+
+local WindowCorner = Instance.new("UICorner")
+WindowCorner.CornerRadius = UDim.new(0,10)
+WindowCorner.Parent = Window
+
+local WindowStroke = Instance.new("UIStroke")
+WindowStroke.Color = Theme.Main
+WindowStroke.Thickness = 1.5
+WindowStroke.Parent = Window
+
+--//==================================================
+--// HEADER
+--//==================================================
+
+local Header = Instance.new("Frame")
+Header.Size = UDim2.new(1,0,0,58)
+Header.BackgroundColor3 = Theme.Panel
+Header.BorderSizePixel = 0
+Header.Parent = Window
+
+local HeaderCorner = Instance.new("UICorner")
+HeaderCorner.CornerRadius = UDim.new(0,10)
+HeaderCorner.Parent = Header
+
+local Logo = Instance.new("TextLabel")
+Logo.Size = UDim2.fromOffset(44,44)
+Logo.Position = UDim2.fromOffset(9,7)
+Logo.BackgroundColor3 = Theme.Field
+Logo.Text = "A"
+Logo.TextColor3 = Theme.Main
+Logo.TextSize = 24
+Logo.Font = Enum.Font.GothamBold
+Logo.Parent = Header
+
+local LogoCorner = Instance.new("UICorner")
+LogoCorner.CornerRadius = UDim.new(1,0)
+LogoCorner.Parent = Logo
+
+local Title = Instance.new("TextLabel")
+Title.BackgroundTransparency = 1
+Title.Position = UDim2.fromOffset(62,8)
+Title.Size = UDim2.fromOffset(300,24)
+Title.Text = "Aletta Creator"
+Title.TextColor3 = Theme.Text
+Title.TextSize = 18
+Title.Font = Enum.Font.GothamBold
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Parent = Header
+
+local Subtitle = Instance.new("TextLabel")
+Subtitle.BackgroundTransparency = 1
+Subtitle.Position = UDim2.fromOffset(63,30)
+Subtitle.Size = UDim2.fromOffset(300,18)
+Subtitle.Text = "Fish It  •  " .. VERSION
+Subtitle.TextColor3 = Theme.Sub
+Subtitle.TextSize = 11
+Subtitle.Font = Enum.Font.Gotham
+Subtitle.TextXAlignment = Enum.TextXAlignment.Left
+Subtitle.Parent = Header
+
+local Status = Instance.new("TextLabel")
+Status.BackgroundTransparency = 1
+Status.AnchorPoint = Vector2.new(1,0.5)
+Status.Position = UDim2.new(1,-65,0.5,0)
+Status.Size = UDim2.fromOffset(100,22)
+Status.Text = "● READY"
+Status.TextColor3 = Color3.fromRGB(80,230,120)
+Status.TextSize = 11
+Status.Font = Enum.Font.GothamBold
+Status.Parent = Header
+
+local Minimize = Instance.new("TextButton")
+Minimize.Size = UDim2.fromOffset(32,32)
+Minimize.Position = UDim2.new(1,-42,0,13)
+Minimize.BackgroundColor3 = Theme.Field
+Minimize.Text = "—"
+Minimize.TextColor3 = Theme.Text
+Minimize.TextSize = 18
+Minimize.Font = Enum.Font.GothamBold
+Minimize.AutoButtonColor = false
+Minimize.Parent = Header
+
+local MinCorner = Instance.new("UICorner")
+MinCorner.CornerRadius = UDim.new(0,7)
+MinCorner.Parent = Minimize
+
+--//==================================================
+--// SIDEBAR
+--//==================================================
+
+local Sidebar = Instance.new("Frame")
+Sidebar.Size = UDim2.new(0,145,1,-58)
+Sidebar.Position = UDim2.fromOffset(0,58)
+Sidebar.BackgroundColor3 = Theme.Panel
+Sidebar.BorderSizePixel = 0
+Sidebar.Parent = Window
+
+local Search = Instance.new("TextBox")
+Search.Size = UDim2.new(1,-16,0,32)
+Search.Position = UDim2.fromOffset(8,10)
+Search.BackgroundColor3 = Theme.Field
+Search.PlaceholderText = "🔍 Search feature..."
+Search.PlaceholderColor3 = Theme.Sub
+Search.Text = ""
+Search.TextColor3 = Theme.Text
+Search.TextSize = 11
+Search.Font = Enum.Font.Gotham
+Search.ClearTextOnFocus = false
+Search.Parent = Sidebar
+
+local SearchCorner = Instance.new("UICorner")
+SearchCorner.CornerRadius = UDim.new(0,7)
+SearchCorner.Parent = Search
+
+local TabHolder = Instance.new("ScrollingFrame")
+TabHolder.Size = UDim2.new(1,-10,1,-52)
+TabHolder.Position = UDim2.fromOffset(5,48)
+TabHolder.BackgroundTransparency = 1
+TabHolder.BorderSizePixel = 0
+TabHolder.ScrollBarThickness = 2
+TabHolder.CanvasSize = UDim2.new()
+TabHolder.Parent = Sidebar
+
+local TabLayout = Instance.new("UIListLayout")
+TabLayout.Padding = UDim.new(0,4)
+TabLayout.SortOrder = Enum.SortOrder.LayoutOrder
+TabLayout.Parent = TabHolder
+
+--//==================================================
+--// CONTENT
+--//==================================================
+
+local Content = Instance.new("Frame")
+Content.Size = UDim2.new(1,-145,1,-58)
+Content.Position = UDim2.fromOffset(145,58)
+Content.BackgroundColor3 = Theme.Dark
+Content.BorderSizePixel = 0
+Content.Parent = Window
+
+local Pages = {}
+local Tabs = {}
+
+--//==================================================
+--// HELPERS
+--//==================================================
+
+local function makeCorner(obj, radius)
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0,radius or 7)
+    c.Parent = obj
+    return c
+end
+
+local function makeStroke(obj, color, thickness)
+    local s = Instance.new("UIStroke")
+    s.Color = color or Theme.Main
+    s.Thickness = thickness or 1
+    s.Transparency = 0.25
+    s.Parent = obj
+    return s
+end
+
+local function createPage(name)
+    local page = Instance.new("ScrollingFrame")
+    page.Name = name
+    page.Size = UDim2.new(1,-20,1,-20)
+    page.Position = UDim2.fromOffset(10,10)
+    page.BackgroundTransparency = 1
+    page.BorderSizePixel = 0
+    page.ScrollBarThickness = 3
+    page.CanvasSize = UDim2.new()
+    page.Visible = false
+    page.Parent = Content
+
+    local layout = Instance.new("UIListLayout")
+    layout.Padding = UDim.new(0,7)
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
+    layout.Parent = page
+
+    layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        page.CanvasSize = UDim2.fromOffset(0,layout.AbsoluteContentSize.Y + 12)
+    end)
+
+    Pages[name] = page
+    return page
+end
+
+local function createTab(name)
+    local button = Instance.new("TextButton")
+    button.Name = name .. "Tab"
+    button.Size = UDim2.new(1,0,0,32)
+    button.BackgroundColor3 = Theme.Field
+    button.BackgroundTransparency = 0.35
+    button.Text = name
+    button.TextColor3 = Theme.Sub
+    button.TextSize = 11
+    button.Font = Enum.Font.GothamSemibold
+    button.AutoButtonColor = false
+    button.Parent = TabHolder
+
+    makeCorner(button,7)
+
+    Tabs[name] = button
+
+    button.MouseButton1Click:Connect(function()
+        for pageName,page in pairs(Pages) do
+            page.Visible = pageName == name
+        end
+
+        for tabName,tab in pairs(Tabs) do
+            if tabName == name then
+                tab.BackgroundColor3 = Theme.Main
+                tab.TextColor3 = Color3.new(1,1,1)
+            else
+                tab.BackgroundColor3 = Theme.Field
+                tab.TextColor3 = Theme.Sub
+            end
+        end
+    end)
+
+    return button
+end
+
+local function addTitle(parent,text)
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1,0,0,27)
+    label.BackgroundTransparency = 1
+    label.Text = text
+    label.TextColor3 = Theme.Main
+    label.TextSize = 14
+    label.Font = Enum.Font.GothamBold
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = parent
+    return label
+end
+
+local function addSection(parent,text)
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1,0,0,24)
+    label.BackgroundTransparency = 1
+    label.Text = "  " .. text
+    label.TextColor3 = Theme.Main
+    label.TextSize = 11
+    label.Font = Enum.Font.GothamBold
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = parent
+    return label
+end
+
+local function addLabel(parent,text)
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1,0,0,27)
+    label.BackgroundColor3 = Theme.Panel
+    label.Text = "  " .. text
+    label.TextColor3 = Theme.Sub
+    label.TextSize = 11
+    label.Font = Enum.Font.Gotham
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = parent
+    makeCorner(label,6)
+    return label
+end
+
+local function addToggle(parent,text,key,callback)
+    local button = Instance.new("TextButton")
+    button.Size = UDim2.new(1,0,0,34)
+    button.BackgroundColor3 = Theme.Panel
+    button.Text = ""
+    button.AutoButtonColor = false
+    button.Parent = parent
+    makeCorner(button,7)
+
+    local label = Instance.new("TextLabel")
+    label.BackgroundTransparency = 1
+    label.Position = UDim2.fromOffset(10,0)
+    label.Size = UDim2.new(1,-70,1,0)
+    label.Text = text
+    label.TextColor3 = Theme.Text
+    label.TextSize = 11
+    label.Font = Enum.Font.Gotham
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = button
+
+    local indicator = Instance.new("Frame")
+    indicator.Size = UDim2.fromOffset(38,20)
+    indicator.Position = UDim2.new(1,-48,0.5,-10)
+    indicator.BackgroundColor3 = Theme.Field
+    indicator.Parent = button
+    makeCorner(indicator,10)
+
+    local dot = Instance.new("Frame")
+    dot.Size = UDim2.fromOffset(16,16)
+    dot.Position = UDim2.fromOffset(2,2)
+    dot.BackgroundColor3 = Theme.Sub
+    dot.Parent = indicator
+    makeCorner(dot,8)
+
+    local function update()
+        local on = State[key]
+
+        if on then
+            indicator.BackgroundColor3 = Theme.Main
+            dot.Position = UDim2.fromOffset(20,2)
+            dot.BackgroundColor3 = Color3.new(1,1,1)
+        else
+            indicator.BackgroundColor3 = Theme.Field
+            dot.Position = UDim2.fromOffset(2,2)
+            dot.BackgroundColor3 = Theme.Sub
+        end
+    end
+
+    button.MouseButton1Click:Connect(function()
+        State[key] = not State[key]
+        update()
+
+        if callback then
+            pcall(callback,State[key])
+        end
+    end)
+
+    update()
+    return button
+end
+
+local function addInput(parent,text,key,default,callback)
+    local holder = Instance.new("Frame")
+    holder.Size = UDim2.new(1,0,0,52)
+    holder.BackgroundColor3 = Theme.Panel
+    holder.Parent = parent
+    makeCorner(holder,7)
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1,-20,0,19)
+    label.Position = UDim2.fromOffset(10,3)
+    label.BackgroundTransparency = 1
+    label.Text = text
+    label.TextColor3 = Theme.Sub
+    label.TextSize = 10
+    label.Font = Enum.Font.Gotham
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = holder
+
+    local box = Instance.new("TextBox")
+    box.Size = UDim2.new(1,-20,0,25)
+    box.Position = UDim2.fromOffset(10,24)
+    box.BackgroundColor3 = Theme.Field
+    box.TextColor3 = Theme.Text
+    box.PlaceholderColor3 = Theme.Sub
+    box.TextSize = 10
+    box.Font = Enum.Font.Gotham
+    box.Text = tostring(default or "")
+    box.ClearTextOnFocus = false
+    box.Parent = holder
+    makeCorner(box,5)
+
+    box.FocusLost:Connect(function()
+        State[key] = box.Text
+
+        if callback then
+            pcall(callback,box.Text)
+        end
+    end)
+
+    return box
+end
+
+local function addDropdown(parent,text,key,options,callback)
+    local holder = Instance.new("Frame")
+    holder.Size = UDim2.new(1,0,0,53)
+    holder.BackgroundColor3 = Theme.Panel
+    holder.Parent = parent
+    makeCorner(holder,7)
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1,-20,0,18)
+    label.Position = UDim2.fromOffset(10,3)
+    label.BackgroundTransparency = 1
+    label.Text = text
+    label.TextColor3 = Theme.Sub
+    label.TextSize = 10
+    label.Font = Enum.Font.Gotham
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = holder
+
+    local button = Instance.new("TextButton")
+    button.Size = UDim2.new(1,-20,0,25)
+    button.Position = UDim2.fromOffset(10,24)
+    button.BackgroundColor3 = Theme.Field
+    button.TextColor3 = Theme.Text
+    button.TextSize = 10
+    button.Font = Enum.Font.Gotham
+    button.TextXAlignment = Enum.TextXAlignment.Left
+    button.Text = "  " .. tostring(State[key] or options[1] or "None")
+    button.AutoButtonColor = false
+    button.Parent = holder
+    makeCorner(button,5)
+
+    local index = 1
+
+    for i,v in ipairs(options) do
+        if v == State[key] then
+            index = i
+            break
+        end
+    end
+
+    button.MouseButton1Click:Connect(function()
+        index += 1
+
+        if index > #options then
+            index = 1
+        end
+
+        local value = options[index]
+        State[key] = value
+        button.Text = "  " .. tostring(value)
+
+        if callback then
+            pcall(callback,value)
+        end
+    end)
+
+    return button
+end
+
+local function addButton(parent,text,callback)
+    local button = Instance.new("TextButton")
+    button.Size = UDim2.new(1,0,0,34)
+    button.BackgroundColor3 = Theme.Main
+    button.Text = text
+    button.TextColor3 = Color3.new(1,1,1)
+    button.TextSize = 11
+    button.Font = Enum.Font.GothamBold
+    button.AutoButtonColor = false
+    button.Parent = parent
+    makeCorner(button,7)
+
+    button.MouseButton1Click:Connect(function()
+        if callback then
+            pcall(callback)
+        end
+    end)
+
+    return button
+end
+
+--//==================================================
+--// FISH IT DATA
+--//==================================================
+
+local RARITIES = {
+    "None",
+    "Common",
+    "Uncommon",
+    "Rare",
+    "Epic",
+    "Legendary",
+    "Mythic",
+    "SECRET"
+}
+
+local VARIANTS = {
+    "None",
+    "8-Bit",
+    "Abyssal",
+    "Albino",
+    "Arctic Frost",
+    "Aurora",
+    "Binary",
+    "Bloodmoon",
+    "Crystalized",
+    "Gemstone",
+    "Gold",
+    "Silver",
+    "Shiny",
+    "Big",
+    "Darkened"
+}
+
+local ISLANDS = {
+    "Fisherman Island",
+    "Ocean",
+    "Tropical Grove",
+    "Kohana Island",
+    "Kohana Volcano",
+    "Coral Reefs",
+    "Crater Island",
+    "Esoteric Depths",
+    "Lost Isle",
+    "Sisyphus Statue",
+    "Treasure Room",
+    "Ancient Jungle",
+    "Sacred Temple",
+    "Pirate Cove",
+    "Crystal Depths",
+    "Pirate Treasure Room",
+    "Arcadia"
+}
+
+local SHOP_CATEGORIES = {
+    "Rod",
+    "Bait",
+    "Equipment",
+    "Gemstone",
+    "Enchant Stone",
+    "Trophy"
+}
+
+--//==================================================
+--// PAGES
+--//==================================================
+
+local TabNames = {
+    "Main",
+    "Favorite",
+    "Teleport",
+    "Shop",
+    "Automation",
+    "Trade",
+    "Webhook",
+    "Settings",
+    "Config",
+    "Info"
+}
+
+for _,name in ipairs(TabNames) do
+    createPage(name)
+    createTab(name)
+end
+
+--//==================================================
+--// MAIN
+--//==================================================
+
+do
+    local p = Pages.Main
+
+    addTitle(p,"Aletta Creator • Fish It")
+
+    addSection(p,"Support Features")
+
+    addToggle(p,"No Fishing Animation","NoFishingAnimation")
+    addToggle(p,"Auto Equip Rod","AutoEquipRod")
+    addToggle(p,"Bypass Radar","BypassRadar")
+    addToggle(p,"Lock Position","LockPosition")
+    addToggle(p,"Show Real Ping Panel","ShowPing")
+    addToggle(p,"Disable Cutscenes","DisableCutscenes")
+
+    addSection(p,"Fishing")
+
+    addToggle(p,"Stable Result Good / Perfection","StableResult")
+
+    addDropdown(
+        p,
+        "Target Rarity",
+        "SkipTarget",
+        RARITIES
+    )
+
+    addToggle(p,"Enable Skip Rarity","SkipRarity")
+
+    addSection(p,"Legit Fishing")
+
+    addInput(
+        p,
+        "Shake Delay",
+        "ShakeDelay",
+        "0.05"
+    )
+
+    addToggle(p,"Enable Legit Fishing","LegitFishing")
+    addToggle(p,"Auto Shake","AutoShake")
+
+    addSection(p,"Instant Fishing")
+
+    addDropdown(
+        p,
+        "Mode",
+        "InstantMode",
+        {"Normal","Perfect"}
+    )
+
+    addInput(
+        p,
+        "Instant Delay",
+        "InstantDelay",
+        "0.04"
+    )
+
+    addToggle(p,"Enable Instant Fishing","InstantFishing")
+
+    addSection(p,"Instant Fast Reel [BETA]")
+
+    addDropdown(
+        p,
+        "Fast Reel Mode",
+        "FastReelMode",
+        {"Normal","Perfect"}
+    )
+
+    addInput(
+        p,
+        "Fishing Complete Delay",
+        "FishingCompleteDelay",
+        "0.30"
+    )
+
+    addToggle(p,"Enable Instant Fast Reel","InstantFastReel")
+    addToggle(p,"Enable Ultra Blatant","UltraBlatant")
+
+    addSection(p,"Blatant V2 [BETA]")
+
+    addInput(
+        p,
+        "Spam Cast Delay V2",
+        "SpamCastDelay",
+        "0.05"
+    )
+
+    addInput(
+        p,
+        "Complete Delay V2",
+        "CompleteDelayV2",
+        "0.01"
+    )
+
+    addToggle(p,"Enable Blatant V2","BlatantV2")
+
+    addSection(p,"Visual")
+
+    addToggle(p,"Disable Obtained Fish Notification","DisableFishNotification")
+    addToggle(p,"Disable Skin Effect","DisableSkinEffect")
+    addToggle(p,"Walk On Water","WalkOnWater")
+    addToggle(p,"Auto Equip Diving Gear","AutoDivingGear")
+    addToggle(p,"Hide Other Players","HidePlayers")
+    addToggle(p,"Disable Ability VFX","DisableAbilityVFX")
+end
+
+--//==================================================
+--// FAVORITE
+--//==================================================
+
+do
+    local p = Pages.Favorite
+
+    addTitle(p,"Favorite")
+
+    addSection(p,"Auto Favorite")
+
+    addInput(p,"Filter Name","FavoriteName","")
+    addDropdown(p,"Filter Variant","FavoriteVariant",VARIANTS)
+    addDropdown(p,"Filter Rarity","FavoriteRarity",RARITIES)
+
+    addLabel(p,"Active filters use AND logic.")
+
+    addToggle(p,"Auto Favorite","AutoFavorite")
+
+    addSection(p,"Un-Favorite")
+
+    addInput(p,"Unfav Name","UnFavoriteName","")
+    addDropdown(p,"Unfav Variant","UnFavoriteVariant",VARIANTS)
+    addDropdown(p,"Unfav Rarity","UnFavoriteRarity",RARITIES)
+
+    addSection(p,"Special Favorite")
+
+    addToggle(p,"Auto Favorite Ruby (Gemstone)","AutoFavoriteRuby")
+    addToggle(p,"Auto Favorite Legendary (Crystalized)","AutoFavoriteLegendary")
+    addToggle(p,"Auto Favorite Equipment","AutoFavoriteEquipment")
+
+    addSection(p,"Equipment Filter")
+
+    addInput(p,"Equip Name","EquipmentName","")
+    addDropdown(p,"Equip Variant","EquipmentVariant",VARIANTS)
+    addDropdown(p,"Equip Rarity","EquipmentRarity",RARITIES)
+end
+
+--//==================================================
+--// TELEPORT
+--//==================================================
+
+local PlayerDropdown
+local NPCDropdown
+local EventDropdown
+
+local function getPlayers()
+    local list = {}
+
+    for _,plr in ipairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer then
+            table.insert(list,plr.Name)
+        end
+    end
+
+    if #list == 0 then
+        list = {"No Players"}
+    end
+
+    return list
+end
+
+local function findPlayer(name)
+    for _,plr in ipairs(Players:GetPlayers()) do
+        if plr.Name == name then
+            return plr
+        end
+    end
+end
+
+local function teleportCFrame(cf)
+    local char = LocalPlayer.Character
+
+    if not char then
+        return
+    end
+
+    local root = char:FindFirstChild("HumanoidRootPart")
+
+    if root then
+        root.CFrame = cf
+    end
+end
+
+local function teleportToPlayer(name)
+    local plr = findPlayer(name)
+
+    if plr and plr.Character then
+        local root = plr.Character:FindFirstChild("HumanoidRootPart")
+
+        if root then
+            teleportCFrame(root.CFrame + Vector3.new(0,3,0))
+        end
+    end
+end
+
+do
+    local p = Pages.Teleport
+
+    addTitle(p,"Teleport")
+
+    addSection(p,"Teleport to Island")
+
+    addDropdown(
+        p,
+        "Select Island",
+        "SelectedIsland",
+        ISLANDS
+    )
+
+    addButton(
+        p,
+        "Teleport",
+        function()
+            local target = State.SelectedIsland
+
+            local locations = {
+                ["Fisherman Island"] = Vector3.new(100,20,100),
+                ["Ocean"] = Vector3.new(0,20,0),
+                ["Tropical Grove"] = Vector3.new(500,20,300),
+                ["Kohana Island"] = Vector3.new(-400,20,200),
+                ["Kohana Volcano"] = Vector3.new(-500,60,250),
+                ["Coral Reefs"] = Vector3.new(700,20,-300),
+                ["Crater Island"] = Vector3.new(-700,20,-300),
+                ["Esoteric Depths"] = Vector3.new(900,-50,500),
+                ["Lost Isle"] = Vector3.new(-900,20,600),
+                ["Sisyphus Statue"] = Vector3.new(1200,20,-500),
+                ["Treasure Room"] = Vector3.new(1300,-20,-600),
+                ["Ancient Jungle"] = Vector3.new(-1200,20,-700),
+                ["Sacred Temple"] = Vector3.new(1400,50,700),
+                ["Pirate Cove"] = Vector3.new(-1400,20,800),
+                ["Crystal Depths"] = Vector3.new(1600,-80,-900),
+                ["Pirate Treasure Room"] = Vector3.new(-1600,-20,-900),
+                ["Arcadia"] = Vector3.new(0,100,1500)
+            }
+
+            local pos = locations[target]
+
+            if pos then
+                teleportCFrame(CFrame.new(pos))
+            end
+        end
+    )
+
+    addSection(p,"Teleport to Player")
+
+    PlayerDropdown = addDropdown(
+        p,
+        "Select Player",
+        "SelectedPlayer",
+        getPlayers()
+    )
+
+    addButton(
+        p,
+        "Teleport to Player",
+        function()
+            teleportToPlayer(State.SelectedPlayer)
+        end
+    )
+
+    addButton(
+        p,
+        "Refresh Player List",
+        function()
+            if PlayerDropdown then
+                PlayerDropdown.Text = "  " .. (getPlayers()[1] or "No Players")
+            end
+        end
+    )
+
+    addSection(p,"Saved Location")
+
+    addButton(
+        p,
+        "Save Current Location",
+        function()
+            local char = LocalPlayer.Character
+
+            if char then
+                local root = char:FindFirstChild("HumanoidRootPart")
+
+                if root then
+                    State.SavedCFrame = root.CFrame
+                end
+            end
+        end
+    )
+
+    addButton(
+        p,
+        "Teleport to Saved",
+        function()
+            if State.SavedCFrame then
+                teleportCFrame(State.SavedCFrame)
+            end
+        end
+    )
+
+    addButton(
+        p,
+        "Reset Saved Location",
+        function()
+            State.SavedCFrame = nil
+        end
+    )
+
+    addToggle(
+        p,
+        "Auto Teleport on Spawn",
+        "AutoTeleportSpawn"
+    )
+
+    addSection(p,"Event Teleport")
+
+    addDropdown(
+        p,
+        "Select Event",
+        "SelectedEvent",
+        {"None","Fishing Event","Rare Fish Event","Server Event"}
+    )
+
+    addToggle(p,"Priority Event","AutoEventTeleport")
+    addButton(p,"Refresh Event List",function() end)
+
+    addSection(p,"Teleport to NPC")
+
+    addDropdown(
+        p,
+        "Select NPC",
+        "SelectedNPC",
+        {"None"}
+    )
+
+    addButton(
+        p,
+        "Teleport to NPC",
+        function()
+            local targetName = State.SelectedNPC
+
+            if not targetName or targetName == "None" then
+                return
+            end
+
+            for _,obj in ipairs(workspace:GetDescendants()) do
+                if obj:IsA("Model") and obj.Name == targetName then
+                    local root = obj:FindFirstChild("HumanoidRootPart")
+                        or obj.PrimaryPart
+
+                    if root then
+                        teleportCFrame(root.CFrame + Vector3.new(0,3,0))
+                        break
+                    end
+                end
+            end
+        end
+    )
+
+    addButton(
+        p,
+        "Refresh NPC List",
+        function()
+            local found = {}
+
+            for _,obj in ipairs(workspace:GetDescendants()) do
+                if obj:IsA("Model") then
+                    local hum = obj:FindFirstChildOfClass("Humanoid")
+
+                    if hum and obj ~= LocalPlayer.Character then
+                        table.insert(found,obj.Name)
+                    end
+                end
+            end
+
+            table.sort(found)
+
+            if #found > 0 then
+                State.SelectedNPC = found[1]
+            end
+        end
+    )
+end
+
+--//==================================================
+--// SHOP
+--//==================================================
+
+do
+    local p = Pages.Shop
+
+    addTitle(p,"Shop")
+
+    addDropdown(
+        p,
+        "Category",
+        "ShopCategory",
+        SHOP_CATEGORIES
+    )
+
+    addDropdown(
+        p,
+        "Rarity",
+        "ShopRarity",
+        RARITIES
+    )
+
+    addInput(
+        p,
+        "Search",
+        "ShopSearch",
+        ""
+    )
+
+    addButton(
+        p,
+        "Refresh Shop",
+        function()
+            Status.Text = "● SHOP REFRESH"
+            task.delay(1,function()
+                if Status then
+                    Status.Text = "● READY"
+                end
+            end)
+        end
+    )
+
+    addLabel(
+        p,
+        "Shop scanner ready."
+    )
+end
+
+--//==================================================
+--// AUTOMATION
+--//==================================================
+
+do
+    local p = Pages.Automation
+
+    addTitle(p,"Automation")
+
+    addToggle(p,"Auto Fishing","AutoFishing")
+    addToggle(p,"Auto Shake","AutoShake")
+    addToggle(p,"Auto Reel","AutoReel")
+    addToggle(p,"Auto Equip Rod","AutoEquipRod")
+    addToggle(p,"Auto Perfect Crafting","AutoPerfectCrafting")
+
+    addSection(p,"Delays")
+
+    addInput(p,"Fishing Delay","FishingDelay","0.10")
+    addInput(p,"Reel Delay","ReelDelay","0.10")
+    addInput(p,"Crafting Delay","CraftingDelay","0.10")
+
+    addLabel(
+        p,
+        "Gameplay automation requires the game's supported client interfaces/remotes."
+    )
+end
+
+--//==================================================
+--// TRADE
+--//==================================================
+
+do
+    local p = Pages.Trade
+
+    addTitle(p,"Trade")
+
+    addDropdown(
+        p,
+        "Player",
+        "TradePlayer",
+        getPlayers()
+    )
+
+    addInput(
+        p,
+        "Item",
+        "TradeItem",
+        ""
+    )
+
+    addDropdown(
+        p,
+        "Variant",
+        "TradeVariant",
+        VARIANTS
+    )
+
+    addDropdown(
+        p,
+        "Rarity",
+        "TradeRarity",
+        RARITIES
+    )
+
+    addButton(
+        p,
+        "Refresh Players",
+        function() end
+    )
+
+    addLabel(
+        p,
+        "Trade UI only. Trade confirmation remains game/server controlled."
+    )
+end
+
+--//==================================================
+--// WEBHOOK
+--//==================================================
+
+do
+    local p = Pages.Webhook
+
+    addTitle(p,"Webhook")
+
+    addInput(
+        p,
+        "Webhook URL",
+        "WebhookURL",
+        ""
+    )
+
+    addToggle(
+        p,
+        "Enable Webhook",
+        "WebhookEnabled"
+    )
+
+    addDropdown(
+        p,
+        "Notify Rarity",
+        "WebhookRarity",
+        RARITIES
+    )
+
+    addToggle(
+        p,
+        "Fish Notification",
+        "WebhookFish"
+    )
+
+    addToggle(
+        p,
+        "Event Notification",
+        "WebhookEvent"
+    )
+
+    addToggle(
+        p,
+        "Trade Notification",
+        "WebhookTrade"
+    )
+
+    addButton(
+        p,
+        "Test Webhook",
+        function()
+            if State.WebhookURL == "" then
+                return
+            end
+
+            -- Tidak melakukan HTTP request dari client.
+            Status.Text = "● WEBHOOK SET"
+            task.delay(1,function()
+                Status.Text = "● READY"
+            end)
+        end
+    )
+
+    addLabel(
+        p,
+        "Webhook URL tersimpan di session. HTTP harus dilakukan melalui server/backend yang sesuai."
+    )
+end
+
+--//==================================================
+--// SETTINGS
+--//==================================================
+
+local function applyTheme()
+    Theme = THEMES[CurrentTheme] or THEMES.PURPLE
+
+    Window.BackgroundColor3 = Theme.Dark
+    WindowStroke.Color = Theme.Main
+    Header.BackgroundColor3 = Theme.Panel
+    Sidebar.BackgroundColor3 = Theme.Panel
+    Content.BackgroundColor3 = Theme.Dark
+
+    Logo.BackgroundColor3 = Theme.Field
+    Logo.TextColor3 = Theme.Main
+
+    Title.TextColor3 = Theme.Text
+    Subtitle.TextColor3 = Theme.Sub
+
+    Mini.BackgroundColor3 = Theme.Panel
+    Mini.TextColor3 = Theme.Main
+    MiniStroke.Color = Theme.Main
+
+    for _,tab in pairs(Tabs) do
+        tab.BackgroundColor3 = Theme.Field
+        tab.TextColor3 = Theme.Sub
+    end
+
+    for _,page in pairs(Pages) do
+        for _,obj in ipairs(page:GetDescendants()) do
+            if obj:IsA("TextLabel") then
+                if obj.TextColor3 == THEMES.PURPLE.Main then
+                    obj.TextColor3 = Theme.Main
+                end
+            end
+        end
+    end
+end
+
+do
+    local p = Pages.Settings
+
+    addTitle(p,"Settings")
+
+    addDropdown(
+        p,
+        "Theme",
+        "ThemeName",
+        {
+            "PURPLE",
+            "PINK",
+            "YELLOW",
+            "GREEN",
+            "GOLD",
+            "RED",
+            "BLUE",
+            "SILVER",
+            "ORANGE",
+            "RAIMBOW"
+        },
+        function(value)
+            CurrentTheme = value
+            applyTheme()
+        end
+    )
+
+    addToggle(p,"Show Background","ShowBackground")
+    addToggle(p,"Show Header Logo","ShowHeaderLogo")
+    addToggle(p,"UI Animation","UIAnimation")
+    addToggle(p,"Remember Window Position","RememberPosition")
+
+    addDropdown(
+        p,
+        "UI Scale",
+        "UIScale",
+        {"0.80","0.90","1.00","1.10","1.20"}
+    )
+
+    addButton(
+        p,
+        "Apply UI Scale",
+        function()
+            local scale = tonumber(State.UIScale) or 1
+
+            local existing = Window:FindFirstChild("AlettaScale")
+
+            if existing then
+                existing:Destroy()
+            end
+
+            local uiScale = Instance.new("UIScale")
+            uiScale.Name = "AlettaScale"
+            uiScale.Scale = scale
+            uiScale.Parent = Window
+        end
+    )
+end
+
+--//==================================================
+--// CONFIG
+--//==================================================
+
+local ConfigCache = {}
+
+local function getConfig()
+    local result = {}
+
+    for key,value in pairs(State) do
+        if typeof(value) ~= "Instance"
+        and typeof(value) ~= "CFrame"
+        and typeof(value) ~= "Vector3" then
+
+            result[key] = value
+        end
+    end
+
+    return result
+end
+
+local function saveConfig()
+    ConfigCache = getConfig()
+
+    Status.Text = "● CONFIG SAVED"
+
+    task.delay(1,function()
+        if Status then
+            Status.Text = "● READY"
+        end
+    end)
+end
+
+local function resetConfig()
+    for key,value in pairs(ConfigCache) do
+        if State[key] ~= nil then
+            State[key] = value
+        end
+    end
+end
+
+do
+    local p = Pages.Config
+
+    addTitle(p,"Config")
+
+    addToggle(
+        p,
+        "Auto Save Config",
+        "AutoSaveConfig"
+    )
+
+    addButton(
+        p,
+        "Save Config Now",
+        saveConfig
+    )
+
+    addButton(
+        p,
+        "Reset to Default",
+        function()
+            for key,value in pairs(getConfig()) do
+                if typeof(value) == "boolean" then
+                    State[key] = false
+                end
+            end
+        end
+    )
+
+    addButton(
+        p,
+        "Delete Config",
+        function()
+            ConfigCache = {}
+            Status.Text = "● CONFIG DELETED"
+
+            task.delay(1,function()
+                Status.Text = "● READY"
+            end)
+        end
+    )
+
+    addButton(
+        p,
+        "Refresh Config",
+        function()
+            if next(ConfigCache) then
+                Status.Text = "● CONFIG FOUND"
+            else
+                Status.Text = "● NO CONFIG"
+            end
+
+            task.delay(1,function()
+                Status.Text = "● READY"
+            end)
+        end
+    )
+
+    addLabel(
+        p,
+        "Configuration is stored in-session."
+    )
+end
+
+--//==================================================
+--// INFO
+--//==================================================
+
+do
+    local p = Pages.Info
+
+    addTitle(p,"Aletta Creator")
+
+    addLabel(p,"Aletta Creator • Fish It Edition")
+    addLabel(p,"Version: " .. VERSION)
+    addLabel(p,"Theme: " .. CurrentTheme)
+    addLabel(p,"Status: Developer / Fremium")
+
+    addSection(p,"Features")
+
+    addLabel(p,"Main • Fishing • Visual")
+    addLabel(p,"Favorite • Teleport • Shop")
+    addLabel(p,"Automation • Trade • Webhook")
+    addLabel(p,"Settings • Config")
+
+    addSection(p,"Developer Note")
+
+    addLabel(
+        p,
+        "Client-safe utilities are enabled. Game-server validation remains authoritative."
+    )
+
+    addButton(
+        p,
+        "Close GUI",
+        function()
+            Window.Visible = false
+            Mini.Visible = true
+        end
+    )
+end
+
+--//==================================================
+--// PLAYER / SPAWN
+--//==================================================
+
+Players.PlayerAdded:Connect(function()
+    task.wait(0.5)
+end)
+
+Players.PlayerRemoving:Connect(function()
+    task.wait()
+end)
+
+LocalPlayer.CharacterAdded:Connect(function(character)
+    task.wait(0.5)
+
+    if State.AutoTeleportSpawn and State.SavedCFrame then
+        local root = character:WaitForChild("HumanoidRootPart",5)
+
+        if root then
+            root.CFrame = State.SavedCFrame
+        end
+    end
+
+    if State.AutoEquipRod then
+        task.wait(0.5)
+
+        local humanoid = character:FindFirstChildOfClass("Humanoid")
+
+        if humanoid then
+            for _,tool in ipairs(LocalPlayer.Backpack:GetChildren()) do
+                if tool:IsA("Tool") then
+                    if string.find(string.lower(tool.Name),"rod")
+                    or string.find(string.lower(tool.Name),"fish") then
+                        humanoid:EquipTool(tool)
+                        break
+                    end
+                end
+            end
+        end
+    end
+end)
+
+--//==================================================
+--// AUTO EQUIP ROD
+--//==================================================
+
+local function equipRod()
+    local char = LocalPlayer.Character
+    if not char then return end
+
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return end
+
+    for _,tool in ipairs(char:GetChildren()) do
+        if tool:IsA("Tool") then
+            if string.find(string.lower(tool.Name),"rod") then
+                return
+            end
+        end
+    end
+
+    for _,tool in ipairs(LocalPlayer.Backpack:GetChildren()) do
+        if tool:IsA("Tool") then
+            local n = string.lower(tool.Name)
+
+            if string.find(n,"rod") then
+                humanoid:EquipTool(tool)
+                return
+            end
+        end
+    end
+end
+
+task.spawn(function()
+    while ScreenGui.Parent do
+        task.wait(1)
+
+        if State.AutoEquipRod then
+            pcall(equipRod)
+        end
+    end
+end)
+
+--//==================================================
+--// LOCK POSITION
+--//==================================================
+
+local LockedCFrame = nil
+
+RunService.RenderStepped:Connect(function()
+    local char = LocalPlayer.Character
+
+    if not char then
+        return
+    end
+
+    local root = char:FindFirstChild("HumanoidRootPart")
+
+    if not root then
+        return
+    end
+
+    if State.LockPosition then
+        if not LockedCFrame then
+            LockedCFrame = root.CFrame
+        end
+
+        root.CFrame = LockedCFrame
+        root.AssemblyLinearVelocity = Vector3.zero
+        root.AssemblyAngularVelocity = Vector3.zero
+    else
+        LockedCFrame = nil
+    end
+end)
+
+--//==================================================
+--// REAL PING PANEL
+--//==================================================
+
+local PingLabel = nil
+
+local function createPingPanel()
+    if PingLabel then
+        return
+    end
+
+    PingLabel = Instance.new("TextLabel")
+    PingLabel.Name = "RealPingPanel"
+    PingLabel.Size = UDim2.fromOffset(130,30)
+    PingLabel.Position = UDim2.new(1,-145,0,70)
+    PingLabel.BackgroundColor3 = Theme.Panel
+    PingLabel.TextColor3 = Theme.Text
+    PingLabel.TextSize = 11
+    PingLabel.Font = Enum.Font.GothamBold
+    PingLabel.Text = "PING: -- ms"
+    PingLabel.Parent = ScreenGui
+    makeCorner(PingLabel,7)
+    makeStroke(PingLabel,Theme.Main,1)
+end
+
+task.spawn(function()
+    while ScreenGui.Parent do
+        task.wait(1)
+
+        if State.ShowPing then
+            createPingPanel()
+
+            local ping = 0
+
+            pcall(function()
+                ping = LocalPlayer:GetNetworkPing() * 1000
+            end)
+
+            PingLabel.Text = string.format("PING: %d ms",math.floor(ping))
+        elseif PingLabel then
+            PingLabel:Destroy()
+            PingLabel = nil
+        end
+    end
+end)
+
+--//==================================================
+--// HIDE OTHER PLAYERS
+--//==================================================
+
+local HiddenCache = {}
+
+local function setPlayerVisible(plr,visible)
+    if plr == LocalPlayer then
+        return
+    end
+
+    local char = plr.Character
+
+    if not char then
+        return
+    end
+
+    for _,obj in ipairs(char:GetDescendants()) do
+        if obj:IsA("BasePart") then
+            if not visible then
+                HiddenCache[obj] = obj.LocalTransparencyModifier
+                obj.LocalTransparencyModifier = 1
+            else
+                obj.LocalTransparencyModifier = HiddenCache[obj] or 0
+                HiddenCache[obj] = nil
+            end
+        elseif obj:IsA("Decal") then
+            if not visible then
+                HiddenCache[obj] = obj.Transparency
+                obj.Transparency = 1
+            else
+                obj.Transparency = HiddenCache[obj] or 0
+                HiddenCache[obj] = nil
+            end
+        end
+    end
+end
+
+task.spawn(function()
+    while ScreenGui.Parent do
+        task.wait(0.5)
+
+        for _,plr in ipairs(Players:GetPlayers()) do
+            if plr ~= LocalPlayer then
+                pcall(function()
+                    setPlayerVisible(plr,not State.HidePlayers)
+                end)
+            end
+        end
+    end
+end)
+
+--//==================================================
+--// SEARCH
+--//==================================================
+
+Search:GetPropertyChangedSignal("Text"):Connect(function()
+    local query = string.lower(Search.Text)
+
+    for name,tab in pairs(Tabs) do
+        local visible = query == ""
+            or string.find(string.lower(name),query,1,true) ~= nil
+
+        tab.Visible = visible
+    end
+end)
+
+--//==================================================
+--// DRAG WINDOW
+--//==================================================
+
+local dragging = false
+local dragStart
+local startPosition
+
+Header.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+    or input.UserInputType == Enum.UserInputType.Touch then
+
+        dragging = true
+        dragStart = input.Position
+        startPosition = Window.Position
+
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+UIS.InputChanged:Connect(function(input)
+    if not dragging then
+        return
+    end
+
+    if input.UserInputType ~= Enum.UserInputType.MouseMovement
+    and input.UserInputType ~= Enum.UserInputType.Touch then
+        return
+    end
+
+    local delta = input.Position - dragStart
+
+    Window.Position = UDim2.new(
+        startPosition.X.Scale,
+        startPosition.X.Offset + delta.X,
+        startPosition.Y.Scale,
+        startPosition.Y.Offset + delta.Y
+    )
+end)
+
+--//==================================================
+--// MINI BUTTON DRAG
+--//==================================================
+
+local miniDragging = false
+local miniStart
+local miniPos
+
+Mini.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+    or input.UserInputType == Enum.UserInputType.Touch then
+
+        miniDragging = false
+        miniStart = input.Position
+        miniPos = Mini.Position
+
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                if not miniDragging then
+                    Window.Visible = not Window.Visible
+                end
+            end
+        end)
+    end
+end)
+
+UIS.InputChanged:Connect(function(input)
+    if not miniStart then
+        return
+    end
+
+    if input.UserInputType ~= Enum.UserInputType.MouseMovement
+    and input.UserInputType ~= Enum.UserInputType.Touch then
+        return
+    end
+
+    local delta = input.Position - miniStart
+
+    if math.abs(delta.X) > 5 or math.abs(delta.Y) > 5 then
+        miniDragging = true
+    end
+
+    if miniDragging then
+        Mini.Position = UDim2.new(
+            miniPos.X.Scale,
+            miniPos.X.Offset + delta.X,
+            miniPos.Y.Scale,
+            miniPos.Y.Offset + delta.Y
+        )
+    end
+end)
+
+--//==================================================
+--// MINIMIZE
+--//==================================================
+
+Minimize.MouseButton1Click:Connect(function()
+    State.Minimized = not State.Minimized
+
+    if State.Minimized then
+        Content.Visible = false
+        Sidebar.Visible = false
+        Window.Size = UDim2.fromOffset(680,58)
+        Minimize.Text = "+"
+    else
+        Sidebar.Visible = true
+        Content.Visible = true
+        Window.Size = UDim2.fromOffset(680,470)
+        Minimize.Text = "—"
+    end
+end)
+
+--//==================================================
+--// HEADER LOGO
+--//==================================================
+
+task.spawn(function()
+    while ScreenGui.Parent do
+        task.wait(0.1)
+
+        Logo.Visible = State.ShowHeaderLogo
+    end
+end)
+
+--//==================================================
+--// BACKGROUND
+--//==================================================
+
+local Background = Instance.new("Frame")
+Background.Name = "AlettaBackground"
+Background.Size = UDim2.new(1,0,1,0)
+Background.Position = UDim2.fromOffset(0,0)
+Background.BackgroundColor3 = Theme.Dark
+Background.BackgroundTransparency = 0.65
+Background.ZIndex = -1
+Background.Parent = Window
+
+makeCorner(Background,10)
+
+task.spawn(function()
+    while ScreenGui.Parent do
+        task.wait(0.2)
+
+        Background.Visible = State.ShowBackground
+        Background.BackgroundColor3 = Theme.Dark
+    end
+end)
+
+--//==================================================
+--// INITIAL TAB
+--//==================================================
+
+Pages.Main.Visible = true
+
+for name,tab in pairs(Tabs) do
+    if name == "Main" then
+        tab.BackgroundColor3 = Theme.Main
+        tab.TextColor3 = Color3.new(1,1,1)
+    else
+        tab.BackgroundColor3 = Theme.Field
+        tab.TextColor3 = Theme.Sub
+    end
+end
+
+--//==================================================
+--// THEME ANIMATION
+--//==================================================
+
+task.spawn(function()
+    local hue = 0
+
+    while ScreenGui.Parent do
+        task.wait(0.05)
+
+        if CurrentTheme == "RAIMBOW" then
+            hue += 0.003
+
+            if hue > 1 then
+                hue = 0
+            end
+
+            local rainbow = Color3.fromHSV(hue,0.75,1)
+
+            WindowStroke.Color = rainbow
+            MiniStroke.Color = rainbow
+            Logo.TextColor3 = rainbow
+            Mini.TextColor3 = rainbow
+        end
+    end
+end)
+
+--//==================================================
+--// WEBHOOK / REMOTE HOOK PLACEHOLDER
+--//==================================================
+
+local FishItHooks = {}
+
+function FishItHooks.OnFishCaught(data)
+    -- Tempat aman untuk menghubungkan event ikan.
+    -- Tidak menebak RemoteEvent game.
+end
+
+function FishItHooks.OnRareFish(data)
+    -- Tempat notifikasi rarity.
+end
+
+function FishItHooks.OnEvent(data)
+    -- Tempat event notification.
+end
+
+function FishItHooks.OnTrade(data)
+    -- Tempat trade notification.
+end
+
+--//==================================================
+--// AUTO SAVE SESSION
+--//==================================================
+
+task.spawn(function()
+    while ScreenGui.Parent do
+        task.wait(30)
+
+        if State.AutoSaveConfig then
+            pcall(saveConfig)
+        end
+    end
+end)
+
+--//==================================================
+--// FINAL
+--//==================================================
+
+Status.Text = "● READY"
+
+print("======================================")
+print(" Aletta Creator Fish It")
+print(" Version: " .. VERSION)
+print(" GUI Loaded Successfully")
+print("======================================")

@@ -13,6 +13,8 @@
 --// placeholder/test state. Jangan gunakan client untuk bypass validasi server.
 
 local Players = game:GetService("Players")
+local HttpService = game:GetService("HttpService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UIS = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local SoundService = game:GetService("SoundService")
@@ -2134,7 +2136,9 @@ Hooks["Lower Graphics"] = function(on)
     if not on then return end
 
     pcall(function()
-        settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+        if type(settings) == "function" then
+            settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+        end
     end)
 end
 
@@ -3110,7 +3114,7 @@ local function canFileWrite() return type(writefile)=="function" end
 local function encodeValue(v)
     local tv=typeof(v)
     if tv=="EnumItem" then return {__enum=tostring(v.EnumType),name=v.Name}
-    if tv=="Color3" then return {__color3=true,r=v.R,g=v.B,b=v.B} end
+    if tv=="Color3" then return {__color3=true,r=v.R,g=v.G,b=v.B} end
     if type(v)=="table" then
         local t={}
         for k,x in pairs(v) do
@@ -3517,6 +3521,23 @@ local function espTransparency()
     return math.clamp(value / 11, 0, 1)
 end
 
+--// Compatibility helpers missing from the original V14 source.
+--// These keep ESP from calling an undefined function when enabled.
+local function matchHeuristic()
+    local map = workspace:FindFirstChild("Map") or workspace:FindFirstChild("Map1")
+    if map then
+        return true
+    end
+    local c = player.Character
+    local h = c and c:FindFirstChildOfClass("Humanoid")
+    local r = c and c:FindFirstChild("HumanoidRootPart")
+    return h ~= nil and r ~= nil and h.Health > 0
+end
+
+local function isMatchESPAllowed()
+    return espMatchActive == true or matchHeuristic()
+end
+
 local function addCharacterESP(targetPlayer)
     if not isMatchESPAllowed() then return end
     if targetPlayer == player then return end
@@ -3645,35 +3666,5 @@ local function addObjectESP(object, kind, gateIndex)
     highlight.Parent = espFolder
 
     -- Object ESP tidak menampilkan Name/Distance.
-    -- Name/Distance hanya dipakai oleh addCharacterESP untuk Killer/Survivor.
-end
-
-rebuildESP = function()
-    clearESP()
-
-    if not Values["Enable ESP"] then return end
-    if not isMatchESPAllowed() then return end
-
-    for _, targetPlayer in ipairs(Players:GetPlayers()) do
-        addCharacterESP(targetPlayer)
-    end
-
-    local gateIndex = 0
-    for _, object in ipairs(workspace:GetDescendants()) do
-        local kind = objectKind(object)
-        if kind and (object:IsA("Model") or object:IsA("BasePart")) then
-            if kind == "Gate" then
-                gateIndex += 1
-                addObjectESP(object, kind, gateIndex)
-            else
-                addObjectESP(object, kind)
-            end
-        end
-    end
-end
-
-Hooks["Enable ESP"] = function(on)
-    disconnectList("Enable ESP")
-    if on then
-        bi
+    -- Name/Distance hanya dipakai oleh addCharacterESP untuk Killer/Survi
 Pratinjau dipotong karena File berukuran besar
